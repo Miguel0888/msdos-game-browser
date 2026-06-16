@@ -1,1 +1,8 @@
 rootProject.name = 'msdos-game-browser'
+
+include 'msdos-game-browser-domain'
+include 'msdos-game-browser-application'
+include 'msdos-game-browser-infrastructure-archive'
+include 'msdos-game-browser-infrastructure-local'
+include 'msdos-game-browser-frontend-swing'
+include 'msdos-game-browser-launcher'

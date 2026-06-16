@@ -1,0 +1,15 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation project(':msdos-game-browser-domain')
+    implementation project(':msdos-game-browser-application')
+    implementation project(':msdos-game-browser-infrastructure-archive')
+    implementation project(':msdos-game-browser-infrastructure-local')
+    implementation project(':msdos-game-browser-frontend-swing')
+}
+
+application {
+    mainClass = 'de.bund.zrb.msdosgames.launcher.MsdosGameBrowserApplication'
+}
