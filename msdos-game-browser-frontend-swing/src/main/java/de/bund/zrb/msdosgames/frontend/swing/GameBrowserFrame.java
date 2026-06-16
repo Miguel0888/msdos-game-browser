@@ -45,6 +45,7 @@ public final class GameBrowserFrame extends JFrame {
     private final AcceptLicenseUseCase acceptLicenseUseCase;
     private final DownloadGameUseCase downloadGameUseCase;
     private final File downloadDirectory;
+    private final DownloadDirectoryOpener downloadDirectoryOpener = new DownloadDirectoryOpener();
 
     private final JTextField searchField = new JTextField(30);
     private final JButton searchButton = new JButton("Suchen");
@@ -57,6 +58,7 @@ public final class GameBrowserFrame extends JFrame {
     private final JComboBox<GameFile> fileComboBox = new JComboBox<GameFile>();
     private final JCheckBox licenseCheckBox = new JCheckBox("Ich habe die oben angezeigten Lizenz- und Rechtehinweise gelesen und akzeptiere sie.");
     private final JButton downloadButton = new JButton("Herunterladen");
+    private final JButton openDownloadFolderButton = new JButton("Download-Ordner öffnen");
     private final JLabel targetDirectoryLabel = new JLabel();
     private final JProgressBar progressBar = new JProgressBar(0, 100);
     private final JLabel statusLabel = new JLabel("Bereit");
@@ -147,8 +149,13 @@ public final class GameBrowserFrame extends JFrame {
         JPanel panel = new JPanel(new BorderLayout(6, 6));
         panel.setBorder(BorderFactory.createEmptyBorder(0, 6, 6, 6));
         progressBar.setStringPainted(true);
+
+        JPanel actionPanel = new JPanel(new BorderLayout(6, 0));
+        actionPanel.add(openDownloadFolderButton, BorderLayout.WEST);
+        actionPanel.add(progressBar, BorderLayout.EAST);
+
         panel.add(statusLabel, BorderLayout.CENTER);
-        panel.add(progressBar, BorderLayout.EAST);
+        panel.add(actionPanel, BorderLayout.EAST);
         return panel;
     }
 
@@ -158,6 +165,7 @@ public final class GameBrowserFrame extends JFrame {
         nextPageButton.addActionListener(event -> loadNextPage());
         licenseCheckBox.addActionListener(event -> acceptCurrentLicenseWhenSelected());
         downloadButton.addActionListener(event -> downloadSelectedFile());
+        openDownloadFolderButton.addActionListener(event -> openCurrentDownloadDirectory());
         fileComboBox.addActionListener(event -> updateSelectedTargetPath());
         gameTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
             @Override
@@ -377,6 +385,23 @@ public final class GameBrowserFrame extends JFrame {
                 }
             }
         }.execute();
+    }
+
+    private void openCurrentDownloadDirectory() {
+        File directory = resolveCurrentDownloadDirectory();
+        try {
+            downloadDirectoryOpener.openDirectory(directory);
+            statusLabel.setText("Download-Ordner geöffnet: " + directory.getAbsolutePath());
+        } catch (Exception exception) {
+            showError("Download-Ordner konnte nicht geöffnet werden: " + directory.getAbsolutePath(), exception);
+        }
+    }
+
+    private File resolveCurrentDownloadDirectory() {
+        if (currentDetails == null) {
+            return downloadDirectory;
+        }
+        return new File(createDownloadDirectoryText(currentDetails));
     }
 
     private void updateSelectedTargetPath() {
