@@ -31,7 +31,7 @@ public final class JdkHttpGateway implements HttpGateway {
         connection.setReadTimeout(READ_TIMEOUT_MILLIS);
         connection.setRequestMethod("GET");
         connection.setRequestProperty("Accept", "application/json,text/html;q=0.9,*/*;q=0.8");
-        connection.setRequestProperty("User-Agent", "msdos-game-browser/1.0 (+https://archive.org)");
+        connection.setRequestProperty("User-Agent", "msdos-game-browser/1.0 (+https://github.com/aresstack/msdos-game-browser)");
         return connection;
     }
 

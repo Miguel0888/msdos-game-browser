@@ -4,6 +4,13 @@ Java-8-Backend und Swing-Oberfläche für die Archive.org-Collection `softwareli
 
 Der Schwerpunkt des Repositories ist die **Backend-API**: Suche, Browsing, Detaildaten, Archive.org-Hinweise, Downloads, Favoriten, H2/Lucene-Cache und optionales Preloading. Die Swing-UI ist ein separates Artefakt auf Basis dieser API.
 
+> **Not affiliated with the Internet Archive.** This project uses public Archive.org
+> search/metadata endpoints and item pages at runtime. **No games, WADs, ZIPs or other
+> Archive.org content are bundled** in the published artifacts. Users are responsible for
+> complying with the Internet Archive [Terms of Use](https://archive.org/about/terms.php)
+> and with the access notices shown for individual items. Downloads only happen after an
+> explicit user action and after the item's Archive.org notice has been accepted.
+
 ## Artefakte
 
 Das Projekt ist auf zwei Maven-Central-Artefakte ausgelegt:
@@ -36,18 +43,18 @@ Swing-Anwendung, die das Backend-Artefakt verwendet.
 Startklasse:
 
 ```text
-ui.msdosgames.com.aresstack.MsdosGameBrowserApplication
+com.aresstack.msdosgames.ui.MsdosGameBrowserApplication
 ```
 
 ## Backend Quickstart
 
 ```java
-import port.application.msdosgames.com.aresstack.GameBrowserBackendService;
-import backend.msdosgames.com.aresstack.MsdosGameBrowserBackend;
-import domain.msdosgames.com.aresstack.GameDetails;
-import domain.msdosgames.com.aresstack.GamePage;
-import domain.msdosgames.com.aresstack.GameSearchCriteria;
-import domain.msdosgames.com.aresstack.GameSummary;
+import com.aresstack.msdosgames.application.port.GameBrowserBackendService;
+import com.aresstack.msdosgames.backend.MsdosGameBrowserBackend;
+import com.aresstack.msdosgames.domain.GameDetails;
+import com.aresstack.msdosgames.domain.GamePage;
+import com.aresstack.msdosgames.domain.GameSearchCriteria;
+import com.aresstack.msdosgames.domain.GameSummary;
 
 public final class Example {
     public static void main(String[] args) throws Exception {
@@ -102,7 +109,7 @@ if (searchPage.hasNextPage()) {
 }
 ```
 
-Die Archive.org-Scrape-API verlangt mindestens 100 Einträge pro Seite. Deshalb erzwingt `GameSearchCriteria` eine Java-8-kompatible, sichere Mindestgröße.
+Der Archive.org-Such-Endpunkt (Scraping API) verlangt mindestens 100 Einträge pro Seite. Deshalb erzwingt `GameSearchCriteria` eine Java-8-kompatible, sichere Mindestgröße.
 
 ### Details laden
 
@@ -199,7 +206,7 @@ Image-Preload-Thread: aus
 Preloading kann explizit aktiviert werden:
 
 ```java
-import backend.msdosgames.com.aresstack.PreloadConfiguration;
+import com.aresstack.msdosgames.backend.PreloadConfiguration;
 
 MsdosGameBrowserBackend backend = MsdosGameBrowserBackend.create(
     PreloadConfiguration.enabled(

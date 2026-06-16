@@ -153,7 +153,7 @@ final class H2GameDetailsStore {
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         connection.setConnectTimeout(10000);
         connection.setReadTimeout(60000);
-        connection.setRequestProperty("User-Agent", "msdos-game-browser/1.0");
+        connection.setRequestProperty("User-Agent", "msdos-game-browser/1.0 (+https://github.com/aresstack/msdos-game-browser)");
         int statusCode = connection.getResponseCode();
         if (statusCode < 200 || statusCode >= 300) {
             throw new IOException("HTTP " + statusCode + " while loading image " + url);

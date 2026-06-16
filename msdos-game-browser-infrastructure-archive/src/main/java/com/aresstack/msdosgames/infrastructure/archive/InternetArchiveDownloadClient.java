@@ -56,7 +56,7 @@ public final class InternetArchiveDownloadClient implements GameDownloader {
         HttpURLConnection connection = (HttpURLConnection) new URL(downloadUrl).openConnection();
         connection.setConnectTimeout(CONNECT_TIMEOUT_MILLIS);
         connection.setReadTimeout(READ_TIMEOUT_MILLIS);
-        connection.setRequestProperty("User-Agent", "msdos-game-browser/1.0 (+https://archive.org)");
+        connection.setRequestProperty("User-Agent", "msdos-game-browser/1.0 (+https://github.com/aresstack/msdos-game-browser)");
         return connection;
     }
 
