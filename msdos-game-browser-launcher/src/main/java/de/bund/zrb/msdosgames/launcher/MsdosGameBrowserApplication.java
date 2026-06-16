@@ -4,6 +4,7 @@ import de.bund.zrb.msdosgames.application.usecase.AcceptArchiveNoticeUseCase;
 import de.bund.zrb.msdosgames.application.usecase.BrowseGamesUseCase;
 import de.bund.zrb.msdosgames.application.usecase.DownloadGameUseCase;
 import de.bund.zrb.msdosgames.application.usecase.FavoriteGamesUseCase;
+import de.bund.zrb.msdosgames.backend.H2ArchiveNoticeAcceptanceStore;
 import de.bund.zrb.msdosgames.backend.LuceneH2GameBrowserBackendService;
 import de.bund.zrb.msdosgames.frontend.swing.GameBrowserFrame;
 import de.bund.zrb.msdosgames.infrastructure.archive.InternetArchiveCatalogClient;
@@ -11,7 +12,6 @@ import de.bund.zrb.msdosgames.infrastructure.archive.InternetArchiveDownloadClie
 import de.bund.zrb.msdosgames.infrastructure.archive.JdkHttpGateway;
 import de.bund.zrb.msdosgames.infrastructure.local.ApplicationDirectories;
 import de.bund.zrb.msdosgames.infrastructure.local.FileBasedFavoriteGameStore;
-import de.bund.zrb.msdosgames.infrastructure.local.FileBasedLicenseAcceptanceStore;
 
 import javax.swing.SwingUtilities;
 
@@ -33,7 +33,7 @@ public final class MsdosGameBrowserApplication {
         JdkHttpGateway httpGateway = new JdkHttpGateway();
         InternetArchiveCatalogClient archiveCatalogClient = new InternetArchiveCatalogClient(httpGateway);
         InternetArchiveDownloadClient downloadClient = new InternetArchiveDownloadClient();
-        FileBasedLicenseAcceptanceStore licenseAcceptanceStore = new FileBasedLicenseAcceptanceStore(ApplicationDirectories.defaultLicenseStoreFile());
+        H2ArchiveNoticeAcceptanceStore archiveNoticeAcceptanceStore = new H2ArchiveNoticeAcceptanceStore(ApplicationDirectories.defaultDatabaseDirectory());
         FileBasedFavoriteGameStore favoriteGameStore = new FileBasedFavoriteGameStore(ApplicationDirectories.defaultFavoritesFile());
         LuceneH2GameBrowserBackendService backendService = new LuceneH2GameBrowserBackendService(
                 archiveCatalogClient,
@@ -42,8 +42,8 @@ public final class MsdosGameBrowserApplication {
 
         return new GameBrowserFrame(
                 backendService,
-                new AcceptArchiveNoticeUseCase(licenseAcceptanceStore),
-                new DownloadGameUseCase(licenseAcceptanceStore, downloadClient),
+                new AcceptArchiveNoticeUseCase(archiveNoticeAcceptanceStore),
+                new DownloadGameUseCase(archiveNoticeAcceptanceStore, downloadClient),
                 new FavoriteGamesUseCase(favoriteGameStore),
                 ApplicationDirectories.defaultApplicationDirectory(),
                 ApplicationDirectories.defaultDownloadDirectory());

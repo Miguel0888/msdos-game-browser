@@ -1,7 +1,6 @@
 package de.bund.zrb.msdosgames.frontend.swing;
 
 import de.bund.zrb.msdosgames.domain.GameDetails;
-import de.bund.zrb.msdosgames.domain.GameFile;
 
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -16,7 +15,6 @@ final class GameDetailsView extends JPanel {
     private final GameImagePreviewPanel imagePreviewPanel;
     private final GameDescriptionPanel descriptionPanel = new GameDescriptionPanel();
     private final ArchiveItemNoticePanel archiveItemNoticePanel = new ArchiveItemNoticePanel();
-    private final DownloadControlsPanel downloadControlsPanel = new DownloadControlsPanel();
 
     GameDetailsView(GameImagePreviewPanel.PreviewImageLoader imageLoader) {
         super(new BorderLayout(6, 6));
@@ -26,12 +24,8 @@ final class GameDetailsView extends JPanel {
         topPanel.add(metadataPanel);
         topPanel.add(imagePreviewPanel);
 
-        JPanel bottomPanel = new JPanel(new GridLayout(2, 1, 6, 6));
-        bottomPanel.add(archiveItemNoticePanel);
-        bottomPanel.add(downloadControlsPanel);
-
-        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, descriptionPanel, bottomPanel);
-        splitPane.setResizeWeight(0.45d);
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, descriptionPanel, archiveItemNoticePanel);
+        splitPane.setResizeWeight(0.55d);
 
         add(topPanel, BorderLayout.NORTH);
         add(new JScrollPane(splitPane), BorderLayout.CENTER);
@@ -42,7 +36,6 @@ final class GameDetailsView extends JPanel {
         imagePreviewPanel.clear();
         descriptionPanel.clear();
         archiveItemNoticePanel.clear();
-        downloadControlsPanel.clear(downloadDirectory);
     }
 
     void showDetails(GameDetails details, File downloadDirectory) {
@@ -50,30 +43,5 @@ final class GameDetailsView extends JPanel {
         imagePreviewPanel.showDetails(details);
         descriptionPanel.showDetails(details);
         archiveItemNoticePanel.showDetails(details);
-        downloadControlsPanel.showDetails(details, downloadDirectory);
-    }
-
-    GameFile getSelectedFile() {
-        return downloadControlsPanel.getSelectedFile();
-    }
-
-    java.util.List<GameFile> getDownloadableFiles() {
-        return downloadControlsPanel.getDownloadableFiles();
-    }
-
-    void selectDownloadFile(GameFile file) {
-        downloadControlsPanel.selectFile(file);
-    }
-
-    File getCurrentDirectory() {
-        return downloadControlsPanel.getCurrentDirectory();
-    }
-
-    File getSelectedTargetFile() {
-        return downloadControlsPanel.getSelectedTargetFile();
-    }
-
-    void updateSelectedTargetPath() {
-        downloadControlsPanel.updateTargetFileLabel();
     }
 }

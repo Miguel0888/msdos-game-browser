@@ -77,6 +77,7 @@ public final class GameBrowserFrame extends JFrame {
     private String nextCursor;
     private GameSummary currentSummary;
     private GameDetails currentDetails;
+    private GameFile selectedDownloadFile;
 
     public GameBrowserFrame(
             GameBrowserBackendService backendService,
@@ -229,13 +230,13 @@ public final class GameBrowserFrame extends JFrame {
     }
 
     private void showDownloadOptionsMenu() {
-        List<GameFile> files = gameDetailsView.getDownloadableFiles();
+        List<GameFile> files = currentDetails == null ? java.util.Collections.<GameFile>emptyList() : currentDetails.getDownloadableFiles();
         if (files.isEmpty()) {
             return;
         }
 
         JPopupMenu menu = new JPopupMenu();
-        GameFile selectedFile = gameDetailsView.getSelectedFile();
+        GameFile selectedFile = selectedDownloadFile;
         for (final GameFile file : files) {
             String title = file == selectedFile ? "✓ " + file.toString() : file.toString();
             JMenuItem item = new JMenuItem(title);
@@ -246,7 +247,7 @@ public final class GameBrowserFrame extends JFrame {
     }
 
     private void selectDownloadFile(GameFile file) {
-        gameDetailsView.selectDownloadFile(file);
+        selectedDownloadFile = file;
         updateSelectedTargetPath();
         if (file != null) {
             statusLabel.setText("Download-Datei ausgewählt: " + file.getName());
@@ -448,6 +449,7 @@ public final class GameBrowserFrame extends JFrame {
 
     private void showDetails(GameDetails details) throws Exception {
         currentDetails = details;
+        selectedDownloadFile = details.getDownloadableFiles().isEmpty() ? null : details.getDownloadableFiles().get(0);
         gameDetailsView.showDetails(details, downloadDirectory);
         updateFavoriteButtonState();
         updateDownloadButtonState();
@@ -456,6 +458,7 @@ public final class GameBrowserFrame extends JFrame {
     private void clearDetails() {
         currentSummary = null;
         currentDetails = null;
+        selectedDownloadFile = null;
         gameDetailsView.clear(downloadDirectory);
         updateFavoriteButtonState();
         updateDownloadButtonState();
@@ -573,7 +576,7 @@ public final class GameBrowserFrame extends JFrame {
             return;
         }
 
-        final GameFile selectedFile = gameDetailsView.getSelectedFile();
+        final GameFile selectedFile = selectedDownloadFile;
         if (selectedFile == null) {
             return;
         }
@@ -582,7 +585,7 @@ public final class GameBrowserFrame extends JFrame {
             return;
         }
 
-        final File targetFile = gameDetailsView.getSelectedTargetFile();
+        final File targetFile = createTargetFile(selectedFile);
         setBusy("Lade " + selectedFile.getName() + " nach " + targetFile.getParentFile().getAbsolutePath() + " ...");
         new SwingWorker<Void, DownloadProgress>() {
             @Override
@@ -660,7 +663,7 @@ public final class GameBrowserFrame extends JFrame {
     }
 
     private void openCurrentDownloadDirectory() {
-        File directory = gameDetailsView.getCurrentDirectory();
+        File directory = createCurrentDownloadDirectory();
         try {
             downloadDirectoryOpener.openDirectory(directory);
             statusLabel.setText("Download-Ordner geöffnet: " + directory.getAbsolutePath());
@@ -670,8 +673,29 @@ public final class GameBrowserFrame extends JFrame {
     }
 
     private void updateSelectedTargetPath() {
-        gameDetailsView.updateSelectedTargetPath();
         updateDownloadButtonState();
+    }
+
+    private File createCurrentDownloadDirectory() {
+        if (currentDetails == null) {
+            return downloadDirectory;
+        }
+        return new File(downloadDirectory, sanitizeDirectoryName(currentDetails.getIdentifier().getValue()));
+    }
+
+    private File createTargetFile(GameFile selectedFile) {
+        if (selectedFile == null) {
+            return createCurrentDownloadDirectory();
+        }
+        return new File(createCurrentDownloadDirectory(), sanitizeRelativePath(selectedFile.getName()));
+    }
+
+    private String sanitizeDirectoryName(String value) {
+        return value.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
+    private String sanitizeRelativePath(String value) {
+        return value.replace('\\', '/').replace("..", "_");
     }
 
     private void showProgress(DownloadProgress progress) {
@@ -693,15 +717,14 @@ public final class GameBrowserFrame extends JFrame {
         progressBar.setIndeterminate(false);
         searchButton.setEnabled(true);
         browseButton.setEnabled(true);
-        gameDetailsView.updateSelectedTargetPath();
         updateFavoriteButtonState();
         updateDownloadButtonState();
     }
 
     private void updateDownloadButtonState() {
-        boolean hasDownload = currentDetails != null && gameDetailsView.getSelectedFile() != null;
+        boolean hasDownload = currentDetails != null && selectedDownloadFile != null;
         downloadButton.setEnabled(hasDownload);
-        downloadOptionsButton.setEnabled(hasDownload && gameDetailsView.getDownloadableFiles().size() > 1);
+        downloadOptionsButton.setEnabled(hasDownload && currentDetails.getDownloadableFiles().size() > 1);
     }
 
     private void showError(String message, Exception exception) {
