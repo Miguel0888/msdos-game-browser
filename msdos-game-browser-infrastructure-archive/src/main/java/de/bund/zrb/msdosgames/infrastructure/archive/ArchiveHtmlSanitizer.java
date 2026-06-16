@@ -16,9 +16,9 @@ public final class ArchiveHtmlSanitizer {
 
     public String sanitize(String html) {
         if (html == null || html.trim().length() == 0) {
-            return "<html><body><p>Keine Beschreibung vorhanden.</p></body></html>";
+            return "<p>Keine Beschreibung vorhanden.</p>";
         }
-        return "<html><body>" + Jsoup.clean(html, safelist) + "</body></html>";
+        return Jsoup.clean(html, safelist);
     }
 
     public String toPlainText(String html) {
