@@ -26,6 +26,10 @@ public final class ApplicationDirectories {
         return new File(defaultApplicationDirectory(), "license-acceptance.properties");
     }
 
+    public static File defaultFavoritesFile() {
+        return new File(defaultApplicationDirectory(), "favorites.json");
+    }
+
     public static File defaultDatabaseDirectory() {
         return ensureDirectory(new File(defaultApplicationDirectory(), "db"));
     }

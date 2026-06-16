@@ -1,9 +1,11 @@
 package de.bund.zrb.msdosgames.frontend.swing;
 
-import de.bund.zrb.msdosgames.application.usecase.AcceptLicenseUseCase;
 import de.bund.zrb.msdosgames.application.port.GameBrowserBackendService;
+import de.bund.zrb.msdosgames.application.usecase.AcceptLicenseUseCase;
 import de.bund.zrb.msdosgames.application.usecase.DownloadGameUseCase;
+import de.bund.zrb.msdosgames.application.usecase.FavoriteGamesUseCase;
 import de.bund.zrb.msdosgames.domain.DownloadProgress;
+import de.bund.zrb.msdosgames.domain.FavoriteGame;
 import de.bund.zrb.msdosgames.domain.GameDetails;
 import de.bund.zrb.msdosgames.domain.GameFile;
 import de.bund.zrb.msdosgames.domain.GameImage;
@@ -23,9 +25,10 @@ import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.SwingUtilities;
+import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.WindowConstants;
 import javax.swing.event.ListSelectionEvent;
@@ -36,6 +39,7 @@ import java.awt.Rectangle;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class GameBrowserFrame extends JFrame {
@@ -45,6 +49,7 @@ public final class GameBrowserFrame extends JFrame {
     private final GameBrowserBackendService backendService;
     private final AcceptLicenseUseCase acceptLicenseUseCase;
     private final DownloadGameUseCase downloadGameUseCase;
+    private final FavoriteGamesUseCase favoriteGamesUseCase;
     private final File applicationDirectory;
     private final File downloadDirectory;
     private final DownloadDirectoryOpener downloadDirectoryOpener = new DownloadDirectoryOpener();
@@ -53,33 +58,39 @@ public final class GameBrowserFrame extends JFrame {
     private final JButton searchButton = new JButton("Suchen");
     private final JButton browseButton = new JButton("Alle anzeigen");
     private final JButton nextPageButton = new JButton("Weitere laden");
+    private final JButton favoriteButton = new JButton("☆ Zu Favoriten");
     private final JButton openDownloadFolderButton = new JButton("Download-Ordner öffnen");
     private final GameTableModel gameTableModel = new GameTableModel();
+    private final GameTableModel favoriteTableModel = new GameTableModel();
     private final JTable gameTable = new JTable(gameTableModel);
+    private final JTable favoriteTable = new JTable(favoriteTableModel);
     private final GameDetailsView gameDetailsView;
     private final JProgressBar progressBar = new JProgressBar(0, 100);
     private final JLabel statusLabel = new JLabel("Bereit");
 
     private String activeSearchQuery;
     private String nextCursor;
+    private GameSummary currentSummary;
     private GameDetails currentDetails;
 
     public GameBrowserFrame(
             GameBrowserBackendService backendService,
             AcceptLicenseUseCase acceptLicenseUseCase,
             DownloadGameUseCase downloadGameUseCase,
+            FavoriteGamesUseCase favoriteGamesUseCase,
             File applicationDirectory,
             File downloadDirectory) {
         super("MS-DOS Game Browser");
         this.backendService = backendService;
         this.acceptLicenseUseCase = acceptLicenseUseCase;
+        this.downloadGameUseCase = downloadGameUseCase;
+        this.favoriteGamesUseCase = favoriteGamesUseCase;
         this.gameDetailsView = new GameDetailsView(new GameImagePreviewPanel.PreviewImageLoader() {
             @Override
             public byte[] loadImage(GameImage image) throws Exception {
                 return backendService.loadPreviewImageNow(image);
             }
         });
-        this.downloadGameUseCase = downloadGameUseCase;
         this.applicationDirectory = applicationDirectory;
         this.downloadDirectory = downloadDirectory;
         configureFrame();
@@ -88,6 +99,7 @@ public final class GameBrowserFrame extends JFrame {
 
     public void showBrowser() {
         setVisible(true);
+        loadFavorites();
         loadFirstBrowsePage();
     }
 
@@ -99,6 +111,7 @@ public final class GameBrowserFrame extends JFrame {
         add(createContentPane(), BorderLayout.CENTER);
         add(createStatusPanel(), BorderLayout.SOUTH);
         gameDetailsView.clear(downloadDirectory);
+        updateFavoriteButtonState();
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosed(WindowEvent event) {
@@ -145,7 +158,13 @@ public final class GameBrowserFrame extends JFrame {
     private JSplitPane createContentPane() {
         JScrollPane tableScrollPane = new JScrollPane(gameTable);
         tableScrollPane.getViewport().addChangeListener(event -> preloadVisibleGames());
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, tableScrollPane, gameDetailsView);
+
+        JScrollPane favoriteScrollPane = new JScrollPane(favoriteTable);
+        JTabbedPane leftTabs = new JTabbedPane();
+        leftTabs.addTab("Spiele", tableScrollPane);
+        leftTabs.addTab("Favoriten", favoriteScrollPane);
+
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftTabs, gameDetailsView);
         splitPane.setResizeWeight(0.40d);
         return splitPane;
     }
@@ -155,8 +174,12 @@ public final class GameBrowserFrame extends JFrame {
         panel.setBorder(BorderFactory.createEmptyBorder(0, 6, 6, 6));
         progressBar.setStringPainted(true);
 
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        buttonPanel.add(favoriteButton);
+        buttonPanel.add(openDownloadFolderButton);
+
         JPanel actionPanel = new JPanel(new BorderLayout(6, 0));
-        actionPanel.add(openDownloadFolderButton, BorderLayout.WEST);
+        actionPanel.add(buttonPanel, BorderLayout.WEST);
         actionPanel.add(progressBar, BorderLayout.EAST);
 
         panel.add(statusLabel, BorderLayout.CENTER);
@@ -168,6 +191,7 @@ public final class GameBrowserFrame extends JFrame {
         searchButton.addActionListener(event -> searchFirstPage());
         browseButton.addActionListener(event -> loadFirstBrowsePage());
         nextPageButton.addActionListener(event -> loadNextPage());
+        favoriteButton.addActionListener(event -> toggleCurrentFavorite());
         openDownloadFolderButton.addActionListener(event -> openCurrentDownloadDirectory());
         gameDetailsView.bindActions(
                 () -> acceptCurrentLicenseWhenSelected(),
@@ -178,6 +202,14 @@ public final class GameBrowserFrame extends JFrame {
             public void valueChanged(ListSelectionEvent event) {
                 if (!event.getValueIsAdjusting()) {
                     loadSelectedGameDetails();
+                }
+            }
+        });
+        favoriteTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+            @Override
+            public void valueChanged(ListSelectionEvent event) {
+                if (!event.getValueIsAdjusting()) {
+                    loadSelectedFavoriteDetails();
                 }
             }
         });
@@ -291,7 +323,21 @@ public final class GameBrowserFrame extends JFrame {
         }
 
         int modelRow = gameTable.convertRowIndexToModel(selectedRow);
-        final GameSummary summary = gameTableModel.getGameAt(modelRow);
+        loadDetailsForSummary(gameTableModel.getGameAt(modelRow));
+    }
+
+    private void loadSelectedFavoriteDetails() {
+        int selectedRow = favoriteTable.getSelectedRow();
+        if (selectedRow < 0) {
+            return;
+        }
+
+        int modelRow = favoriteTable.convertRowIndexToModel(selectedRow);
+        loadDetailsForSummary(favoriteTableModel.getGameAt(modelRow));
+    }
+
+    private void loadDetailsForSummary(final GameSummary summary) {
+        currentSummary = summary;
         setBusy("Lade Details für " + summary.getTitle() + " ...");
         new SwingWorker<GameDetails, Void>() {
             @Override
@@ -315,11 +361,79 @@ public final class GameBrowserFrame extends JFrame {
     private void showDetails(GameDetails details) throws Exception {
         currentDetails = details;
         gameDetailsView.showDetails(details, acceptLicenseUseCase.isAccepted(details), downloadDirectory);
+        updateFavoriteButtonState();
     }
 
     private void clearDetails() {
+        currentSummary = null;
         currentDetails = null;
         gameDetailsView.clear(downloadDirectory);
+        updateFavoriteButtonState();
+    }
+
+    private void loadFavorites() {
+        new SwingWorker<List<FavoriteGame>, Void>() {
+            @Override
+            protected List<FavoriteGame> doInBackground() throws Exception {
+                return favoriteGamesUseCase.listFavorites();
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    showFavorites(get());
+                } catch (Exception exception) {
+                    showError("Favoriten konnten nicht geladen werden.", exception);
+                }
+            }
+        }.execute();
+    }
+
+    private void showFavorites(List<FavoriteGame> favorites) {
+        List<GameSummary> summaries = new ArrayList<GameSummary>();
+        for (FavoriteGame favorite : favorites) {
+            summaries.add(favorite.toGameSummary());
+        }
+        favoriteTableModel.replaceGames(summaries);
+    }
+
+    private void toggleCurrentFavorite() {
+        if (currentDetails == null) {
+            return;
+        }
+
+        try {
+            if (favoriteGamesUseCase.isFavorite(currentDetails.getIdentifier())) {
+                favoriteGamesUseCase.removeFavorite(currentDetails.getIdentifier());
+                statusLabel.setText("Favorit entfernt: " + currentDetails.getTitle());
+            } else {
+                favoriteGamesUseCase.addFavorite(currentSummary, currentDetails);
+                statusLabel.setText("Favorit hinzugefügt: " + currentDetails.getTitle());
+            }
+            loadFavorites();
+            updateFavoriteButtonState();
+        } catch (Exception exception) {
+            showError("Favorit konnte nicht gespeichert werden.", exception);
+        }
+    }
+
+    private void updateFavoriteButtonState() {
+        if (currentDetails == null) {
+            favoriteButton.setEnabled(false);
+            favoriteButton.setText("☆ Zu Favoriten");
+            return;
+        }
+
+        favoriteButton.setEnabled(true);
+        try {
+            if (favoriteGamesUseCase.isFavorite(currentDetails.getIdentifier())) {
+                favoriteButton.setText("★ Favorit entfernen");
+            } else {
+                favoriteButton.setText("☆ Zu Favoriten");
+            }
+        } catch (Exception exception) {
+            favoriteButton.setText("☆ Zu Favoriten");
+        }
     }
 
     private void acceptCurrentLicenseWhenSelected() {
@@ -449,6 +563,7 @@ public final class GameBrowserFrame extends JFrame {
         progressBar.setIndeterminate(true);
         searchButton.setEnabled(false);
         browseButton.setEnabled(false);
+        favoriteButton.setEnabled(false);
     }
 
     private void setReady() {
@@ -456,6 +571,7 @@ public final class GameBrowserFrame extends JFrame {
         searchButton.setEnabled(true);
         browseButton.setEnabled(true);
         gameDetailsView.updateSelectedTargetPath();
+        updateFavoriteButtonState();
     }
 
     private void showError(String message, Exception exception) {
