@@ -2,7 +2,7 @@ package de.bund.zrb.msdosgames.application.usecase;
 
 import de.bund.zrb.msdosgames.application.port.DownloadProgressListener;
 import de.bund.zrb.msdosgames.application.port.GameDownloader;
-import de.bund.zrb.msdosgames.application.port.LicenseAcceptanceStore;
+import de.bund.zrb.msdosgames.application.port.ArchiveNoticeAcceptanceStore;
 import de.bund.zrb.msdosgames.domain.ArchiveItemNotice;
 import de.bund.zrb.msdosgames.domain.DownloadRequest;
 import de.bund.zrb.msdosgames.domain.GameFile;
@@ -23,7 +23,7 @@ class DownloadGameUseCaseTest {
         RecordingDownloader downloader = new RecordingDownloader();
         DownloadGameUseCase useCase = new DownloadGameUseCase(new RejectingLicenseStore(), downloader);
 
-        assertThrows(LicenseNotAcceptedException.class, new org.junit.jupiter.api.function.Executable() {
+        assertThrows(ArchiveNoticeNotAcceptedException.class, new org.junit.jupiter.api.function.Executable() {
             @Override
             public void execute() throws Throwable {
                 useCase.downloadAcceptedGame(
@@ -38,7 +38,7 @@ class DownloadGameUseCaseTest {
         assertFalse(downloader.wasCalled());
     }
 
-    private static final class RejectingLicenseStore implements LicenseAcceptanceStore {
+    private static final class RejectingLicenseStore implements ArchiveNoticeAcceptanceStore {
         @Override
         public boolean hasAccepted(GameIdentifier identifier, ArchiveItemNotice archiveItemNotice) {
             return false;

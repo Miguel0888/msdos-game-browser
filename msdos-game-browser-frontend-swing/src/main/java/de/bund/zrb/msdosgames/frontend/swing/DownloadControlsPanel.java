@@ -5,8 +5,6 @@ import de.bund.zrb.msdosgames.domain.GameFile;
 
 import javax.swing.BorderFactory;
 import javax.swing.DefaultComboBoxModel;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -16,8 +14,6 @@ import java.io.File;
 final class DownloadControlsPanel extends JPanel {
 
     private final JComboBox<GameFile> fileComboBox = new JComboBox<GameFile>();
-    private final JCheckBox noticeCheckBox = new JCheckBox("Ich habe die angezeigten Archive.org-Hinweise gelesen und akzeptiere sie.");
-    private final JButton downloadButton = new JButton("Herunterladen");
     private final JLabel targetFileLabel = new JLabel("Ziel: -");
 
     private File baseDirectory;
@@ -28,18 +24,11 @@ final class DownloadControlsPanel extends JPanel {
         setBorder(BorderFactory.createTitledBorder("Download"));
         fileComboBox.setRenderer(new GameFileComboBoxRenderer());
 
-        JPanel centerPanel = new JPanel(new BorderLayout(4, 4));
-        centerPanel.add(targetFileLabel, BorderLayout.NORTH);
-        centerPanel.add(noticeCheckBox, BorderLayout.CENTER);
-
         add(fileComboBox, BorderLayout.NORTH);
-        add(centerPanel, BorderLayout.CENTER);
-        add(downloadButton, BorderLayout.SOUTH);
+        add(targetFileLabel, BorderLayout.CENTER);
     }
 
-    void bindActions(Runnable acceptAction, Runnable downloadAction, Runnable selectionChangedAction) {
-        noticeCheckBox.addActionListener(event -> acceptAction.run());
-        downloadButton.addActionListener(event -> downloadAction.run());
+    void bindActions(Runnable selectionChangedAction) {
         fileComboBox.addActionListener(event -> selectionChangedAction.run());
     }
 
@@ -47,36 +36,23 @@ final class DownloadControlsPanel extends JPanel {
         this.baseDirectory = baseDirectory;
         currentDetails = null;
         fileComboBox.setModel(new DefaultComboBoxModel<GameFile>());
-        noticeCheckBox.setSelected(false);
-        noticeCheckBox.setEnabled(false);
         targetFileLabel.setText("Ziel: " + baseDirectory.getAbsolutePath());
         updateDownloadButtonState();
     }
 
-    void showDetails(GameDetails details, boolean accepted, File baseDirectory) {
+    void showDetails(GameDetails details, File baseDirectory) {
         this.baseDirectory = baseDirectory;
         currentDetails = details;
         fileComboBox.setModel(new DefaultComboBoxModel<GameFile>(details.getDownloadableFiles().toArray(new GameFile[details.getDownloadableFiles().size()])));
         if (fileComboBox.getItemCount() > 0) {
             fileComboBox.setSelectedIndex(0);
         }
-        noticeCheckBox.setEnabled(true);
-        noticeCheckBox.setSelected(accepted);
         updateTargetFileLabel();
         updateDownloadButtonState();
     }
 
     GameFile getSelectedFile() {
         return (GameFile) fileComboBox.getSelectedItem();
-    }
-
-    boolean isNoticeAccepted() {
-        return noticeCheckBox.isSelected();
-    }
-
-    void setNoticeAccepted(boolean accepted) {
-        noticeCheckBox.setSelected(accepted);
-        updateDownloadButtonState();
     }
 
     File getCurrentDirectory() {
@@ -99,7 +75,7 @@ final class DownloadControlsPanel extends JPanel {
     }
 
     void updateDownloadButtonState() {
-        downloadButton.setEnabled(currentDetails != null && getSelectedFile() != null && noticeCheckBox.isSelected());
+
     }
 
     private String sanitizeDirectoryName(String value) {

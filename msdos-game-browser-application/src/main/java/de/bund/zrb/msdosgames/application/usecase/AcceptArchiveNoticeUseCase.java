@@ -5,11 +5,11 @@ import de.bund.zrb.msdosgames.domain.GameDetails;
 
 import java.io.IOException;
 
-public final class AcceptLicenseUseCase {
+public final class AcceptArchiveNoticeUseCase {
 
     private final ArchiveNoticeAcceptanceStore acceptanceStore;
 
-    public AcceptLicenseUseCase(ArchiveNoticeAcceptanceStore acceptanceStore) {
+    public AcceptArchiveNoticeUseCase(ArchiveNoticeAcceptanceStore acceptanceStore) {
         if (acceptanceStore == null) {
             throw new IllegalArgumentException("acceptanceStore must not be null");
         }

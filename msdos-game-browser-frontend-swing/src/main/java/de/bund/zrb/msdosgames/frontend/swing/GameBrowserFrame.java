@@ -1,7 +1,7 @@
 package de.bund.zrb.msdosgames.frontend.swing;
 
 import de.bund.zrb.msdosgames.application.port.GameBrowserBackendService;
-import de.bund.zrb.msdosgames.application.usecase.AcceptLicenseUseCase;
+import de.bund.zrb.msdosgames.application.usecase.AcceptArchiveNoticeUseCase;
 import de.bund.zrb.msdosgames.application.usecase.DownloadGameUseCase;
 import de.bund.zrb.msdosgames.application.usecase.FavoriteGamesUseCase;
 import de.bund.zrb.msdosgames.domain.DownloadProgress;
@@ -47,7 +47,7 @@ public final class GameBrowserFrame extends JFrame {
     private static final int PAGE_SIZE = 100;
 
     private final GameBrowserBackendService backendService;
-    private final AcceptLicenseUseCase acceptLicenseUseCase;
+    private final AcceptArchiveNoticeUseCase acceptArchiveNoticeUseCase;
     private final DownloadGameUseCase downloadGameUseCase;
     private final FavoriteGamesUseCase favoriteGamesUseCase;
     private final File applicationDirectory;
@@ -58,6 +58,7 @@ public final class GameBrowserFrame extends JFrame {
     private final JButton searchButton = new JButton("Suchen");
     private final JButton browseButton = new JButton("Alle anzeigen");
     private final JButton nextPageButton = new JButton("Weitere laden");
+    private final JButton downloadButton = new JButton("Download");
     private final JButton favoriteButton = new JButton("☆ Zu Favoriten");
     private final JButton openDownloadFolderButton = new JButton("Download-Ordner öffnen");
     private final GameTableModel gameTableModel = new GameTableModel();
@@ -75,14 +76,14 @@ public final class GameBrowserFrame extends JFrame {
 
     public GameBrowserFrame(
             GameBrowserBackendService backendService,
-            AcceptLicenseUseCase acceptLicenseUseCase,
+            AcceptArchiveNoticeUseCase acceptArchiveNoticeUseCase,
             DownloadGameUseCase downloadGameUseCase,
             FavoriteGamesUseCase favoriteGamesUseCase,
             File applicationDirectory,
             File downloadDirectory) {
         super("MS-DOS Game Browser");
         this.backendService = backendService;
-        this.acceptLicenseUseCase = acceptLicenseUseCase;
+        this.acceptArchiveNoticeUseCase = acceptArchiveNoticeUseCase;
         this.downloadGameUseCase = downloadGameUseCase;
         this.favoriteGamesUseCase = favoriteGamesUseCase;
         this.gameDetailsView = new GameDetailsView(new GameImagePreviewPanel.PreviewImageLoader() {
@@ -111,7 +112,9 @@ public final class GameBrowserFrame extends JFrame {
         add(createContentPane(), BorderLayout.CENTER);
         add(createStatusPanel(), BorderLayout.SOUTH);
         gameDetailsView.clear(downloadDirectory);
+        getRootPane().setDefaultButton(searchButton);
         updateFavoriteButtonState();
+        updateDownloadButtonState();
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosed(WindowEvent event) {
@@ -144,14 +147,19 @@ public final class GameBrowserFrame extends JFrame {
     }
 
     private JPanel createSearchPanel() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel panel = new JPanel(new BorderLayout(6, 0));
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         panel.setBorder(BorderFactory.createEmptyBorder(6, 6, 0, 6));
-        panel.add(new JLabel("Spiel:"));
-        panel.add(searchField);
-        panel.add(searchButton);
-        panel.add(browseButton);
-        panel.add(nextPageButton);
+        searchPanel.add(new JLabel("Spiel:"));
+        searchPanel.add(searchField);
+        searchPanel.add(searchButton);
+        searchPanel.add(browseButton);
+        searchPanel.add(nextPageButton);
+        actionPanel.add(downloadButton);
         nextPageButton.setEnabled(false);
+        panel.add(searchPanel, BorderLayout.WEST);
+        panel.add(actionPanel, BorderLayout.EAST);
         return panel;
     }
 
@@ -188,15 +196,14 @@ public final class GameBrowserFrame extends JFrame {
     }
 
     private void bindActions() {
+        searchField.addActionListener(event -> searchFirstPage());
         searchButton.addActionListener(event -> searchFirstPage());
         browseButton.addActionListener(event -> loadFirstBrowsePage());
         nextPageButton.addActionListener(event -> loadNextPage());
+        downloadButton.addActionListener(event -> downloadSelectedFile());
         favoriteButton.addActionListener(event -> toggleCurrentFavorite());
         openDownloadFolderButton.addActionListener(event -> openCurrentDownloadDirectory());
-        gameDetailsView.bindActions(
-                () -> acceptCurrentLicenseWhenSelected(),
-                () -> downloadSelectedFile(),
-                () -> updateSelectedTargetPath());
+        gameDetailsView.bindActions(() -> updateSelectedTargetPath());
         gameTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
             @Override
             public void valueChanged(ListSelectionEvent event) {
@@ -360,8 +367,9 @@ public final class GameBrowserFrame extends JFrame {
 
     private void showDetails(GameDetails details) throws Exception {
         currentDetails = details;
-        gameDetailsView.showDetails(details, acceptLicenseUseCase.isAccepted(details), downloadDirectory);
+        gameDetailsView.showDetails(details, downloadDirectory);
         updateFavoriteButtonState();
+        updateDownloadButtonState();
     }
 
     private void clearDetails() {
@@ -369,6 +377,7 @@ public final class GameBrowserFrame extends JFrame {
         currentDetails = null;
         gameDetailsView.clear(downloadDirectory);
         updateFavoriteButtonState();
+        updateDownloadButtonState();
     }
 
     private void loadFavorites() {
@@ -436,20 +445,46 @@ public final class GameBrowserFrame extends JFrame {
         }
     }
 
-    private void acceptCurrentLicenseWhenSelected() {
-        if (currentDetails == null || !gameDetailsView.isNoticeAccepted()) {
-            gameDetailsView.updateSelectedTargetPath();
-            return;
+    private boolean ensureArchiveNoticeAcceptedForDownload() {
+        try {
+            if (acceptArchiveNoticeUseCase.isAccepted(currentDetails)) {
+                return true;
+            }
+        } catch (Exception exception) {
+            showError("Die gespeicherte Bestätigung konnte nicht gelesen werden.", exception);
+            return false;
+        }
+
+        int result = JOptionPane.showConfirmDialog(
+                this,
+                createArchiveNoticePromptText(),
+                "Archive.org-Hinweise bestätigen",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+        if (result != JOptionPane.YES_OPTION) {
+            statusLabel.setText("Download abgebrochen: Archive.org-Hinweise nicht bestätigt");
+            return false;
         }
 
         try {
-            acceptLicenseUseCase.accept(currentDetails);
-            gameDetailsView.setNoticeAccepted(true);
-            statusLabel.setText("Archive.org-Hinweise akzeptiert für " + currentDetails.getTitle());
+            acceptArchiveNoticeUseCase.accept(currentDetails);
+            statusLabel.setText("Archive.org-Hinweise bestätigt für " + currentDetails.getTitle());
+            return true;
         } catch (Exception exception) {
-            gameDetailsView.setNoticeAccepted(false);
             showError("Die Bestätigung konnte nicht gespeichert werden.", exception);
+            return false;
         }
+    }
+
+    private String createArchiveNoticePromptText() {
+        StringBuilder text = new StringBuilder();
+        text.append("Bitte bestätige vor dem Download die Archive.org-Hinweise.\n\n");
+        text.append("Spiel: ").append(currentDetails.getTitle()).append('\n');
+        text.append("Verfügbarkeit: ").append(currentDetails.getArchiveItemNotice().getAvailabilityText()).append('\n');
+        text.append("Quelle: ").append(currentDetails.getArchiveItemNotice().getSourceUrl()).append("\n\n");
+        text.append(currentDetails.getArchiveItemNotice().getAccessText()).append("\n\n");
+        text.append("Fortfahren und Download starten?");
+        return text.toString();
     }
 
     private void downloadSelectedFile() {
@@ -459,6 +494,10 @@ public final class GameBrowserFrame extends JFrame {
 
         final GameFile selectedFile = gameDetailsView.getSelectedFile();
         if (selectedFile == null) {
+            return;
+        }
+
+        if (!ensureArchiveNoticeAcceptedForDownload()) {
             return;
         }
 
@@ -551,6 +590,7 @@ public final class GameBrowserFrame extends JFrame {
 
     private void updateSelectedTargetPath() {
         gameDetailsView.updateSelectedTargetPath();
+        updateDownloadButtonState();
     }
 
     private void showProgress(DownloadProgress progress) {
@@ -564,6 +604,7 @@ public final class GameBrowserFrame extends JFrame {
         searchButton.setEnabled(false);
         browseButton.setEnabled(false);
         favoriteButton.setEnabled(false);
+        downloadButton.setEnabled(false);
     }
 
     private void setReady() {
@@ -572,6 +613,11 @@ public final class GameBrowserFrame extends JFrame {
         browseButton.setEnabled(true);
         gameDetailsView.updateSelectedTargetPath();
         updateFavoriteButtonState();
+        updateDownloadButtonState();
+    }
+
+    private void updateDownloadButtonState() {
+        downloadButton.setEnabled(currentDetails != null && gameDetailsView.getSelectedFile() != null);
     }
 
     private void showError(String message, Exception exception) {

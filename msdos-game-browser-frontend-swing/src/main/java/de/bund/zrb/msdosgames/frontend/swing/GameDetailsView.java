@@ -37,8 +37,8 @@ final class GameDetailsView extends JPanel {
         add(new JScrollPane(splitPane), BorderLayout.CENTER);
     }
 
-    void bindActions(Runnable acceptAction, Runnable downloadAction, Runnable selectionChangedAction) {
-        downloadControlsPanel.bindActions(acceptAction, downloadAction, selectionChangedAction);
+    void bindActions(Runnable selectionChangedAction) {
+        downloadControlsPanel.bindActions(selectionChangedAction);
     }
 
     void clear(File downloadDirectory) {
@@ -49,24 +49,16 @@ final class GameDetailsView extends JPanel {
         downloadControlsPanel.clear(downloadDirectory);
     }
 
-    void showDetails(GameDetails details, boolean accepted, File downloadDirectory) {
+    void showDetails(GameDetails details, File downloadDirectory) {
         metadataPanel.showDetails(details);
         imagePreviewPanel.showDetails(details);
         descriptionPanel.showDetails(details);
         archiveItemNoticePanel.showDetails(details);
-        downloadControlsPanel.showDetails(details, accepted, downloadDirectory);
+        downloadControlsPanel.showDetails(details, downloadDirectory);
     }
 
     GameFile getSelectedFile() {
         return downloadControlsPanel.getSelectedFile();
-    }
-
-    boolean isNoticeAccepted() {
-        return downloadControlsPanel.isNoticeAccepted();
-    }
-
-    void setNoticeAccepted(boolean accepted) {
-        downloadControlsPanel.setNoticeAccepted(accepted);
     }
 
     File getCurrentDirectory() {
@@ -79,6 +71,5 @@ final class GameDetailsView extends JPanel {
 
     void updateSelectedTargetPath() {
         downloadControlsPanel.updateTargetFileLabel();
-        downloadControlsPanel.updateDownloadButtonState();
     }
 }

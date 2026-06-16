@@ -1,6 +1,6 @@
 package de.bund.zrb.msdosgames.launcher;
 
-import de.bund.zrb.msdosgames.application.usecase.AcceptLicenseUseCase;
+import de.bund.zrb.msdosgames.application.usecase.AcceptArchiveNoticeUseCase;
 import de.bund.zrb.msdosgames.application.usecase.BrowseGamesUseCase;
 import de.bund.zrb.msdosgames.application.usecase.DownloadGameUseCase;
 import de.bund.zrb.msdosgames.application.usecase.FavoriteGamesUseCase;
@@ -42,7 +42,7 @@ public final class MsdosGameBrowserApplication {
 
         return new GameBrowserFrame(
                 backendService,
-                new AcceptLicenseUseCase(licenseAcceptanceStore),
+                new AcceptArchiveNoticeUseCase(licenseAcceptanceStore),
                 new DownloadGameUseCase(licenseAcceptanceStore, downloadClient),
                 new FavoriteGamesUseCase(favoriteGameStore),
                 ApplicationDirectories.defaultApplicationDirectory(),

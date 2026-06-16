@@ -1,6 +1,6 @@
 package de.bund.zrb.msdosgames.infrastructure.local;
 
-import de.bund.zrb.msdosgames.application.port.LicenseAcceptanceStore;
+import de.bund.zrb.msdosgames.application.port.ArchiveNoticeAcceptanceStore;
 import de.bund.zrb.msdosgames.domain.ArchiveItemNotice;
 import de.bund.zrb.msdosgames.domain.GameIdentifier;
 
@@ -12,7 +12,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Properties;
 
-public final class FileBasedLicenseAcceptanceStore implements LicenseAcceptanceStore {
+public final class FileBasedLicenseAcceptanceStore implements ArchiveNoticeAcceptanceStore {
 
     private final File storeFile;
     private final Properties properties = new Properties();
