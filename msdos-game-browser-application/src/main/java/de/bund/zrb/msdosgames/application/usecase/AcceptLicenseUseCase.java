@@ -17,10 +17,10 @@ public final class AcceptLicenseUseCase {
     }
 
     public boolean isAccepted(GameDetails gameDetails) throws IOException {
-        return licenseAcceptanceStore.hasAccepted(gameDetails.getIdentifier(), gameDetails.getLicenseNotice());
+        return licenseAcceptanceStore.hasAccepted(gameDetails.getIdentifier(), gameDetails.getArchiveItemNotice());
     }
 
     public void accept(GameDetails gameDetails) throws IOException {
-        licenseAcceptanceStore.accept(gameDetails.getIdentifier(), gameDetails.getLicenseNotice());
+        licenseAcceptanceStore.accept(gameDetails.getIdentifier(), gameDetails.getArchiveItemNotice());
     }
 }

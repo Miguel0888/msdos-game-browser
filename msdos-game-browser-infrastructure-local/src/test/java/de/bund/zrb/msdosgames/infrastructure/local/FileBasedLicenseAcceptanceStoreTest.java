@@ -1,11 +1,12 @@
 package de.bund.zrb.msdosgames.infrastructure.local;
 
+import de.bund.zrb.msdosgames.domain.ArchiveItemNotice;
 import de.bund.zrb.msdosgames.domain.GameIdentifier;
-import de.bund.zrb.msdosgames.domain.LicenseNotice;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -16,16 +17,16 @@ class FileBasedLicenseAcceptanceStoreTest {
     File temporaryDirectory;
 
     @Test
-    void persistsAcceptanceForSameLicenseNotice() throws Exception {
+    void persistsAcceptanceForSameArchiveItemNotice() throws Exception {
         File storeFile = new File(temporaryDirectory, "acceptance.properties");
         FileBasedLicenseAcceptanceStore store = new FileBasedLicenseAcceptanceStore(storeFile);
         GameIdentifier identifier = GameIdentifier.of("doom");
-        LicenseNotice licenseNotice = new LicenseNotice("license", "rights", "source");
+        ArchiveItemNotice notice = new ArchiveItemNotice("Download Options", "access", "source", "", false, true, Collections.emptyList());
 
-        assertFalse(store.hasAccepted(identifier, licenseNotice));
+        assertFalse(store.hasAccepted(identifier, notice));
 
-        store.accept(identifier, licenseNotice);
+        store.accept(identifier, notice);
 
-        assertTrue(new FileBasedLicenseAcceptanceStore(storeFile).hasAccepted(identifier, licenseNotice));
+        assertTrue(new FileBasedLicenseAcceptanceStore(storeFile).hasAccepted(identifier, notice));
     }
 }

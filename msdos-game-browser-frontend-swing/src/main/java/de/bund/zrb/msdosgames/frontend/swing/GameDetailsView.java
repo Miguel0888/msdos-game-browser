@@ -15,7 +15,7 @@ final class GameDetailsView extends JPanel {
     private final GameMetadataPanel metadataPanel = new GameMetadataPanel();
     private final GameImagePreviewPanel imagePreviewPanel;
     private final GameDescriptionPanel descriptionPanel = new GameDescriptionPanel();
-    private final LicenseNoticePanel licenseNoticePanel = new LicenseNoticePanel();
+    private final ArchiveItemNoticePanel archiveItemNoticePanel = new ArchiveItemNoticePanel();
     private final DownloadControlsPanel downloadControlsPanel = new DownloadControlsPanel();
 
     GameDetailsView(GameImagePreviewPanel.PreviewImageLoader imageLoader) {
@@ -27,7 +27,7 @@ final class GameDetailsView extends JPanel {
         topPanel.add(imagePreviewPanel);
 
         JPanel bottomPanel = new JPanel(new GridLayout(2, 1, 6, 6));
-        bottomPanel.add(licenseNoticePanel);
+        bottomPanel.add(archiveItemNoticePanel);
         bottomPanel.add(downloadControlsPanel);
 
         JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, descriptionPanel, bottomPanel);
@@ -45,7 +45,7 @@ final class GameDetailsView extends JPanel {
         metadataPanel.clear();
         imagePreviewPanel.clear();
         descriptionPanel.clear();
-        licenseNoticePanel.clear();
+        archiveItemNoticePanel.clear();
         downloadControlsPanel.clear(downloadDirectory);
     }
 
@@ -53,7 +53,7 @@ final class GameDetailsView extends JPanel {
         metadataPanel.showDetails(details);
         imagePreviewPanel.showDetails(details);
         descriptionPanel.showDetails(details);
-        licenseNoticePanel.showDetails(details);
+        archiveItemNoticePanel.showDetails(details);
         downloadControlsPanel.showDetails(details, accepted, downloadDirectory);
     }
 

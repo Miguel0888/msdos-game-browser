@@ -3,6 +3,7 @@ package de.bund.zrb.msdosgames.infrastructure.archive;
 import com.google.gson.Gson;
 import de.bund.zrb.msdosgames.application.port.GameCatalog;
 import de.bund.zrb.msdosgames.application.port.GameDetailsProvider;
+import de.bund.zrb.msdosgames.domain.ArchiveItemNotice;
 import de.bund.zrb.msdosgames.domain.GameDetails;
 import de.bund.zrb.msdosgames.domain.GameFile;
 import de.bund.zrb.msdosgames.domain.GameIdentifier;
@@ -10,7 +11,6 @@ import de.bund.zrb.msdosgames.domain.GameImage;
 import de.bund.zrb.msdosgames.domain.GamePage;
 import de.bund.zrb.msdosgames.domain.GameSearchCriteria;
 import de.bund.zrb.msdosgames.domain.GameSummary;
-import de.bund.zrb.msdosgames.domain.LicenseNotice;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -25,6 +25,7 @@ public final class InternetArchiveCatalogClient implements GameCatalog, GameDeta
     private final ArchiveSearchQueryBuilder searchQueryBuilder;
     private final ArchiveHtmlSanitizer htmlSanitizer;
     private final ArchiveFileFilter fileFilter;
+    private final ArchiveItemPageFactsParser itemPageFactsParser;
 
     public InternetArchiveCatalogClient(HttpGateway httpGateway) {
         this(httpGateway, new Gson(), new InternetArchiveUrlBuilder(), new ArchiveSearchQueryBuilder(), new ArchiveHtmlSanitizer());
@@ -45,6 +46,7 @@ public final class InternetArchiveCatalogClient implements GameCatalog, GameDeta
         this.searchQueryBuilder = searchQueryBuilder;
         this.htmlSanitizer = htmlSanitizer;
         this.fileFilter = new ArchiveFileFilter();
+        this.itemPageFactsParser = new ArchiveItemPageFactsParser();
     }
 
     @Override
@@ -68,12 +70,12 @@ public final class InternetArchiveCatalogClient implements GameCatalog, GameDeta
         List<ArchiveMetadataResponse.ArchiveFile> archiveFiles = response == null ? Collections.<ArchiveMetadataResponse.ArchiveFile>emptyList() : response.files;
         String title = metadata == null ? identifier.getValue() : ArchiveJsonValues.text(metadata.title);
         String descriptionText = metadata == null ? "" : htmlSanitizer.toPlainText(ArchiveJsonValues.text(metadata.description));
-        LicenseNotice licenseNotice = createLicenseNotice(identifier, metadata);
+        ArchiveItemNotice archiveItemNotice = loadArchiveItemNotice(identifier);
         List<GameFile> files = mapFiles(archiveFiles);
         List<GameImage> images = mapImages(identifier, archiveFiles);
         long itemSize = response == null ? 0L : ArchiveJsonValues.number(response.item_size);
 
-        return new GameDetails(identifier, title, descriptionText, licenseNotice, files, images, itemSize);
+        return new GameDetails(identifier, title, descriptionText, archiveItemNotice, files, images, itemSize);
     }
 
     private GamePage loadSearchPage(String query, GameSearchCriteria criteria) throws IOException {
@@ -104,10 +106,10 @@ public final class InternetArchiveCatalogClient implements GameCatalog, GameDeta
                 ArchiveJsonValues.number(item.item_size));
     }
 
-    private LicenseNotice createLicenseNotice(GameIdentifier identifier, ArchiveMetadataResponse.ArchiveMetadata metadata) {
-        String licenseUrl = metadata == null ? "" : ArchiveJsonValues.text(metadata.licenseurl);
-        String rights = metadata == null ? "" : ArchiveJsonValues.text(metadata.rights);
-        return new LicenseNotice(licenseUrl, rights, urlBuilder.buildItemUrl(identifier));
+    private ArchiveItemNotice loadArchiveItemNotice(GameIdentifier identifier) throws IOException {
+        String itemUrl = urlBuilder.buildItemUrl(identifier);
+        String itemHtml = httpGateway.getText(itemUrl);
+        return itemPageFactsParser.parse(itemHtml, itemUrl);
     }
 
     private List<GameFile> mapFiles(List<ArchiveMetadataResponse.ArchiveFile> archiveFiles) {

@@ -1,14 +1,13 @@
 package de.bund.zrb.msdosgames.infrastructure.local;
 
 import de.bund.zrb.msdosgames.application.port.LicenseAcceptanceStore;
+import de.bund.zrb.msdosgames.domain.ArchiveItemNotice;
 import de.bund.zrb.msdosgames.domain.GameIdentifier;
-import de.bund.zrb.msdosgames.domain.LicenseNotice;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Properties;
@@ -16,84 +15,81 @@ import java.util.Properties;
 public final class FileBasedLicenseAcceptanceStore implements LicenseAcceptanceStore {
 
     private final File storeFile;
+    private final Properties properties = new Properties();
 
     public FileBasedLicenseAcceptanceStore(File storeFile) {
         if (storeFile == null) {
             throw new IllegalArgumentException("storeFile must not be null");
         }
         this.storeFile = storeFile;
+        load();
     }
 
     @Override
-    public synchronized boolean hasAccepted(GameIdentifier identifier, LicenseNotice licenseNotice) throws IOException {
-        Properties properties = loadProperties();
-        String keyPrefix = createKeyPrefix(identifier);
-        String acceptedSignature = properties.getProperty(keyPrefix + ".signature", "");
-        return acceptedSignature.equals(createSignature(licenseNotice));
+    public synchronized boolean hasAccepted(GameIdentifier identifier, ArchiveItemNotice archiveItemNotice) throws IOException {
+        String key = createKey(identifier);
+        String expectedSignature = createSignature(archiveItemNotice);
+        return expectedSignature.equals(properties.getProperty(key + ".signature"));
     }
 
     @Override
-    public synchronized void accept(GameIdentifier identifier, LicenseNotice licenseNotice) throws IOException {
-        Properties properties = loadProperties();
-        String keyPrefix = createKeyPrefix(identifier);
-        properties.setProperty(keyPrefix + ".signature", createSignature(licenseNotice));
-        properties.setProperty(keyPrefix + ".acceptedAtMillis", String.valueOf(System.currentTimeMillis()));
-        properties.setProperty(keyPrefix + ".sourceUrl", licenseNotice.getSourceUrl());
-        saveProperties(properties);
+    public synchronized void accept(GameIdentifier identifier, ArchiveItemNotice archiveItemNotice) throws IOException {
+        String key = createKey(identifier);
+        properties.setProperty(key + ".signature", createSignature(archiveItemNotice));
+        properties.setProperty(key + ".acceptedAtMillis", String.valueOf(System.currentTimeMillis()));
+        properties.setProperty(key + ".sourceUrl", archiveItemNotice.getSourceUrl());
+        save();
     }
 
-    private Properties loadProperties() throws IOException {
-        Properties properties = new Properties();
+    private void load() {
         if (!storeFile.isFile()) {
-            return properties;
+            return;
         }
 
-        FileInputStream inputStream = new FileInputStream(storeFile);
+        FileInputStream inputStream = null;
         try {
+            inputStream = new FileInputStream(storeFile);
             properties.load(inputStream);
-            return properties;
+        } catch (IOException ignored) {
         } finally {
-            inputStream.close();
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (IOException ignored) {
+                }
+            }
         }
     }
 
-    private void saveProperties(Properties properties) throws IOException {
-        File parentDirectory = storeFile.getParentFile();
-        if (!parentDirectory.isDirectory() && !parentDirectory.mkdirs()) {
-            throw new IOException("Cannot create directory " + parentDirectory);
+    private void save() throws IOException {
+        File parent = storeFile.getParentFile();
+        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+            throw new IOException("Cannot create directory " + parent.getAbsolutePath());
         }
 
         FileOutputStream outputStream = new FileOutputStream(storeFile);
         try {
-            properties.store(outputStream, "MS-DOS game browser license acceptances");
+            properties.store(outputStream, "MS-DOS Game Browser archive item notice acceptances");
         } finally {
             outputStream.close();
         }
     }
 
-    private String createKeyPrefix(GameIdentifier identifier) {
+    private String createKey(GameIdentifier identifier) {
         return "game." + identifier.getValue().replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
-    private String createSignature(LicenseNotice licenseNotice) throws IOException {
+    private String createSignature(ArchiveItemNotice archiveItemNotice) throws IOException {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(licenseNotice.toSignatureSource().getBytes(StandardCharsets.UTF_8));
-            return toHex(hash);
+            byte[] hash = digest.digest(archiveItemNotice.toSignatureSource().getBytes("UTF-8"));
+            StringBuilder builder = new StringBuilder();
+            for (byte value : hash) {
+                builder.append(String.format("%02x", value & 0xff));
+            }
+            return builder.toString();
         } catch (NoSuchAlgorithmException exception) {
             throw new IOException("SHA-256 is not available", exception);
         }
-    }
-
-    private String toHex(byte[] bytes) {
-        StringBuilder text = new StringBuilder();
-        for (byte value : bytes) {
-            String hex = Integer.toHexString(value & 0xff);
-            if (hex.length() == 1) {
-                text.append('0');
-            }
-            text.append(hex);
-        }
-        return text.toString();
     }
 }

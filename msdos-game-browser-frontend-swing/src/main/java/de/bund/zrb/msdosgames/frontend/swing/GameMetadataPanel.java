@@ -44,7 +44,7 @@ final class GameMetadataPanel extends JPanel {
     void showDetails(GameDetails details) {
         currentDetails = details;
         titleButton.setText("<html><u>" + escape(details.getTitle()) + "</u></html>");
-        titleButton.setEnabled(details.getLicenseNotice().getSourceUrl().length() > 0);
+        titleButton.setEnabled(details.getArchiveItemNotice().getSourceUrl().length() > 0);
         identifierLabel.setText("Identifier: " + details.getIdentifier().getValue());
         sizeLabel.setText("Item-Größe: " + formatSize(details.getItemSize()));
     }
@@ -64,7 +64,7 @@ final class GameMetadataPanel extends JPanel {
         if (currentDetails == null) {
             return;
         }
-        String url = currentDetails.getLicenseNotice().getSourceUrl();
+        String url = currentDetails.getArchiveItemNotice().getSourceUrl();
         try {
             externalUrlOpener.openUrl(url);
         } catch (Exception exception) {

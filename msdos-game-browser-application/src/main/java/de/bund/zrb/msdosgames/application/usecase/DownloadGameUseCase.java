@@ -6,7 +6,7 @@ import de.bund.zrb.msdosgames.application.port.LicenseAcceptanceStore;
 import de.bund.zrb.msdosgames.domain.DownloadRequest;
 import de.bund.zrb.msdosgames.domain.GameFile;
 import de.bund.zrb.msdosgames.domain.GameIdentifier;
-import de.bund.zrb.msdosgames.domain.LicenseNotice;
+import de.bund.zrb.msdosgames.domain.ArchiveItemNotice;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,11 +31,11 @@ public final class DownloadGameUseCase {
 
     public void downloadAcceptedGame(
             GameIdentifier identifier,
-            LicenseNotice licenseNotice,
+            ArchiveItemNotice archiveItemNotice,
             GameFile gameFile,
             File targetDirectory,
             DownloadProgressListener progressListener) throws IOException {
-        if (!licenseAcceptanceStore.hasAccepted(identifier, licenseNotice)) {
+        if (!licenseAcceptanceStore.hasAccepted(identifier, archiveItemNotice)) {
             throw new LicenseNotAcceptedException(identifier);
         }
 

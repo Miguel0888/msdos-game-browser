@@ -331,7 +331,7 @@ public final class GameBrowserFrame extends JFrame {
         try {
             acceptLicenseUseCase.accept(currentDetails);
             gameDetailsView.setNoticeAccepted(true);
-            statusLabel.setText("Rechtehinweis akzeptiert für " + currentDetails.getTitle());
+            statusLabel.setText("Archive.org-Hinweise akzeptiert für " + currentDetails.getTitle());
         } catch (Exception exception) {
             gameDetailsView.setNoticeAccepted(false);
             showError("Die Bestätigung konnte nicht gespeichert werden.", exception);
@@ -355,7 +355,7 @@ public final class GameBrowserFrame extends JFrame {
             protected Void doInBackground() throws Exception {
                 downloadGameUseCase.downloadAcceptedGame(
                         currentDetails.getIdentifier(),
-                        currentDetails.getLicenseNotice(),
+                        currentDetails.getArchiveItemNotice(),
                         selectedFile,
                         downloadDirectory,
                         progress -> publish(progress));

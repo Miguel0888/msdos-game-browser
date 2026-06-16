@@ -3,14 +3,15 @@ package de.bund.zrb.msdosgames.application.usecase;
 import de.bund.zrb.msdosgames.application.port.DownloadProgressListener;
 import de.bund.zrb.msdosgames.application.port.GameDownloader;
 import de.bund.zrb.msdosgames.application.port.LicenseAcceptanceStore;
+import de.bund.zrb.msdosgames.domain.ArchiveItemNotice;
 import de.bund.zrb.msdosgames.domain.DownloadRequest;
 import de.bund.zrb.msdosgames.domain.GameFile;
 import de.bund.zrb.msdosgames.domain.GameIdentifier;
-import de.bund.zrb.msdosgames.domain.LicenseNotice;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -18,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class DownloadGameUseCaseTest {
 
     @Test
-    void blocksDownloadWhenLicenseWasNotAccepted() throws Exception {
+    void blocksDownloadWhenArchiveNoticeWasNotAccepted() throws Exception {
         RecordingDownloader downloader = new RecordingDownloader();
         DownloadGameUseCase useCase = new DownloadGameUseCase(new RejectingLicenseStore(), downloader);
 
@@ -27,7 +28,7 @@ class DownloadGameUseCaseTest {
             public void execute() throws Throwable {
                 useCase.downloadAcceptedGame(
                         GameIdentifier.of("doom"),
-                        new LicenseNotice("", "rights", "source"),
+                        new ArchiveItemNotice("Download Options", "access", "source", "", false, true, Collections.emptyList()),
                         new GameFile("doom.zip", "ZIP", 42L, "", ""),
                         new File("build/test-downloads"),
                         null);
@@ -39,12 +40,12 @@ class DownloadGameUseCaseTest {
 
     private static final class RejectingLicenseStore implements LicenseAcceptanceStore {
         @Override
-        public boolean hasAccepted(GameIdentifier identifier, LicenseNotice licenseNotice) {
+        public boolean hasAccepted(GameIdentifier identifier, ArchiveItemNotice archiveItemNotice) {
             return false;
         }
 
         @Override
-        public void accept(GameIdentifier identifier, LicenseNotice licenseNotice) {
+        public void accept(GameIdentifier identifier, ArchiveItemNotice archiveItemNotice) {
         }
     }
 

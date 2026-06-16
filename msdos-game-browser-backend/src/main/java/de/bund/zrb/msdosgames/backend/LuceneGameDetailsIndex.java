@@ -41,8 +41,9 @@ final class LuceneGameDetailsIndex {
         document.add(new StringField("identifier", details.getIdentifier().getValue(), Field.Store.YES));
         document.add(new TextField("title", details.getTitle(), Field.Store.NO));
         document.add(new TextField("description", details.getDescriptionText(), Field.Store.NO));
-        document.add(new TextField("rights", details.getLicenseNotice().getRights(), Field.Store.NO));
-        document.add(new StringField("pageUrl", details.getLicenseNotice().getSourceUrl(), Field.Store.NO));
+        document.add(new TextField("availability", details.getArchiveItemNotice().getAvailabilityText(), Field.Store.NO));
+        document.add(new TextField("access", details.getArchiveItemNotice().getAccessText(), Field.Store.NO));
+        document.add(new StringField("pageUrl", details.getArchiveItemNotice().getSourceUrl(), Field.Store.NO));
         writer.updateDocument(new Term("identifier", details.getIdentifier().getValue()), document);
         writer.commit();
     }

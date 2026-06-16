@@ -16,7 +16,7 @@ import java.io.File;
 final class DownloadControlsPanel extends JPanel {
 
     private final JComboBox<GameFile> fileComboBox = new JComboBox<GameFile>();
-    private final JCheckBox noticeCheckBox = new JCheckBox("Ich habe die angezeigten Lizenz- und Rechtehinweise gelesen und akzeptiere sie.");
+    private final JCheckBox noticeCheckBox = new JCheckBox("Ich habe die angezeigten Archive.org-Hinweise gelesen und akzeptiere sie.");
     private final JButton downloadButton = new JButton("Herunterladen");
     private final JLabel targetFileLabel = new JLabel("Ziel: -");
 

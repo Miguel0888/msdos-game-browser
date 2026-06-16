@@ -1,10 +1,11 @@
 package de.bund.zrb.msdosgames.backend;
 
+import de.bund.zrb.msdosgames.domain.ArchiveItemNotice;
+import de.bund.zrb.msdosgames.domain.ArchiveMetadataEntry;
 import de.bund.zrb.msdosgames.domain.GameDetails;
 import de.bund.zrb.msdosgames.domain.GameFile;
 import de.bund.zrb.msdosgames.domain.GameIdentifier;
 import de.bund.zrb.msdosgames.domain.GameImage;
-import de.bund.zrb.msdosgames.domain.LicenseNotice;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,9 +17,13 @@ final class GameDetailsRecordMapper {
         record.identifier = details.getIdentifier().getValue();
         record.title = details.getTitle();
         record.description = details.getDescriptionText();
-        record.licenseUrl = details.getLicenseNotice().getLicenseUrl();
-        record.rights = details.getLicenseNotice().getRights();
-        record.pageUrl = details.getLicenseNotice().getSourceUrl();
+        record.availabilityText = details.getArchiveItemNotice().getAvailabilityText();
+        record.accessText = details.getArchiveItemNotice().getAccessText();
+        record.pageUrl = details.getArchiveItemNotice().getSourceUrl();
+        record.termsUrl = details.getArchiveItemNotice().getTermsUrl();
+        record.streamOnly = details.getArchiveItemNotice().isStreamOnly();
+        record.downloadOptionsAvailable = details.getArchiveItemNotice().hasDownloadOptionsAvailable();
+        record.metadataEntries = toMetadataEntryRecords(details.getArchiveItemNotice().getMetadataEntries());
         record.itemSize = details.getItemSize();
         record.files = toFileRecords(details.getDownloadableFiles());
         record.images = toImageRecords(details.getPreviewImages());
@@ -30,10 +35,39 @@ final class GameDetailsRecordMapper {
                 GameIdentifier.of(record.identifier),
                 record.title,
                 record.description,
-                new LicenseNotice(record.licenseUrl, record.rights, record.pageUrl),
+                new ArchiveItemNotice(
+                        record.availabilityText,
+                        record.accessText,
+                        record.pageUrl,
+                        record.termsUrl,
+                        record.streamOnly,
+                        record.downloadOptionsAvailable,
+                        toMetadataEntries(record.metadataEntries)),
                 toFiles(record.files),
                 toImages(record.images),
                 record.itemSize);
+    }
+
+    private List<GameDetailsRecord.MetadataEntryRecord> toMetadataEntryRecords(List<ArchiveMetadataEntry> entries) {
+        List<GameDetailsRecord.MetadataEntryRecord> records = new ArrayList<GameDetailsRecord.MetadataEntryRecord>();
+        for (ArchiveMetadataEntry entry : entries) {
+            GameDetailsRecord.MetadataEntryRecord record = new GameDetailsRecord.MetadataEntryRecord();
+            record.name = entry.getName();
+            record.value = entry.getValue();
+            records.add(record);
+        }
+        return records;
+    }
+
+    private List<ArchiveMetadataEntry> toMetadataEntries(List<GameDetailsRecord.MetadataEntryRecord> records) {
+        List<ArchiveMetadataEntry> entries = new ArrayList<ArchiveMetadataEntry>();
+        if (records == null) {
+            return entries;
+        }
+        for (GameDetailsRecord.MetadataEntryRecord record : records) {
+            entries.add(new ArchiveMetadataEntry(record.name, record.value));
+        }
+        return entries;
     }
 
     private List<GameDetailsRecord.GameFileRecord> toFileRecords(List<GameFile> files) {
