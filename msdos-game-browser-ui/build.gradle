@@ -1,0 +1,26 @@
+plugins {
+    id 'application'
+    id 'maven-publish'
+}
+
+dependencies {
+    implementation project(':msdos-game-browser-backend')
+    implementation project(':msdos-game-browser-frontend-swing')
+}
+
+application {
+    mainClass = 'de.bund.zrb.msdosgames.ui.MsdosGameBrowserApplication'
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'msdos-game-browser-ui'
+            pom {
+                name = 'MS-DOS Game Browser UI'
+                description = 'Swing UI for the MS-DOS Game Browser backend.'
+            }
+        }
+    }
+}

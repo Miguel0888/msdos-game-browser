@@ -1,9 +1,30 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
 dependencies {
-    implementation project(':msdos-game-browser-domain')
-    implementation project(':msdos-game-browser-application')
+    api project(':msdos-game-browser-domain')
+    api project(':msdos-game-browser-application')
+
+    implementation project(':msdos-game-browser-infrastructure-archive')
+    implementation project(':msdos-game-browser-infrastructure-local')
 
     implementation 'org.apache.lucene:lucene-core:8.11.4'
     implementation 'org.apache.lucene:lucene-analyzers-common:8.11.4'
     implementation 'com.h2database:h2:1.4.200'
     implementation 'com.google.code.gson:gson:2.10.1'
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'msdos-game-browser-backend'
+            pom {
+                name = 'MS-DOS Game Browser Backend'
+                description = 'Backend API for browsing Archive.org MS-DOS games with optional Lucene/H2 caching and preloading.'
+            }
+        }
+    }
 }

@@ -26,8 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public final class LuceneH2GameBrowserBackendService implements GameBrowserBackendService {
 
-    private static final int BACKGROUND_DETAIL_THREADS = 4;
-
+    private final PreloadConfiguration preloadConfiguration;
     private final GameCatalog gameCatalog;
     private final GameDetailsProvider gameDetailsProvider;
     private final H2GameDetailsStore store;
@@ -43,19 +42,35 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
     private volatile Future<?> lowPriorityImageFuture;
 
     public LuceneH2GameBrowserBackendService(GameCatalog gameCatalog, GameDetailsProvider gameDetailsProvider, File databaseDirectory) {
+        this(gameCatalog, gameDetailsProvider, databaseDirectory, PreloadConfiguration.disabled());
+    }
+
+    public LuceneH2GameBrowserBackendService(
+            GameCatalog gameCatalog,
+            GameDetailsProvider gameDetailsProvider,
+            File databaseDirectory,
+            PreloadConfiguration preloadConfiguration) {
         if (gameCatalog == null) {
             throw new IllegalArgumentException("gameCatalog must not be null");
         }
         if (gameDetailsProvider == null) {
             throw new IllegalArgumentException("gameDetailsProvider must not be null");
         }
+        this.preloadConfiguration = preloadConfiguration == null ? PreloadConfiguration.disabled() : preloadConfiguration;
         this.gameCatalog = gameCatalog;
         this.gameDetailsProvider = gameDetailsProvider;
         this.store = new H2GameDetailsStore(databaseDirectory);
         this.index = new LuceneGameDetailsIndex();
         this.userExecutor = Executors.newSingleThreadExecutor(new NamedThreadFactory("msdos-user-load"));
-        this.detailExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(BACKGROUND_DETAIL_THREADS, new NamedThreadFactory("msdos-preload-details"));
-        this.imageExecutor = Executors.newSingleThreadExecutor(new NamedThreadFactory("msdos-preload-images"));
+        if (this.preloadConfiguration.isEnabled()) {
+            this.detailExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(this.preloadConfiguration.getDetailThreads(), new NamedThreadFactory("msdos-preload-details"));
+            this.imageExecutor = this.preloadConfiguration.isPreloadImagesWhenIdle()
+                    ? Executors.newSingleThreadExecutor(new NamedThreadFactory("msdos-preload-images"))
+                    : null;
+        } else {
+            this.detailExecutor = null;
+            this.imageExecutor = null;
+        }
     }
 
     @Override
@@ -92,13 +107,16 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
 
     @Override
     public void preloadDetails(List<GameSummary> games, int firstIndex, int lastIndex) {
+        if (!preloadConfiguration.isEnabled()) {
+            return;
+        }
         cancelLowPriorityImagePreloading();
         if (games == null || games.isEmpty()) {
             return;
         }
 
-        int safeFirstIndex = Math.max(0, firstIndex);
-        int safeLastIndex = Math.min(games.size() - 1, lastIndex);
+        int safeFirstIndex = Math.max(0, firstIndex - preloadConfiguration.getLookBehind());
+        int safeLastIndex = Math.min(games.size() - 1, lastIndex + preloadConfiguration.getLookAhead());
         for (int index = safeFirstIndex; index <= safeLastIndex; index++) {
             queueBackgroundDetailsLoad(games.get(index).getIdentifier());
         }
@@ -142,14 +160,18 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
     public void shutdown() {
         cancelLowPriorityImagePreloading();
         userExecutor.shutdownNow();
-        detailExecutor.shutdownNow();
-        imageExecutor.shutdownNow();
+        if (detailExecutor != null) {
+            detailExecutor.shutdownNow();
+        }
+        if (imageExecutor != null) {
+            imageExecutor.shutdownNow();
+        }
         store.close();
         index.close();
     }
 
     private void queueBackgroundDetailsLoad(final GameIdentifier identifier) {
-        if (!queuedDetailLoads.add(identifier)) {
+        if (detailExecutor == null || !queuedDetailLoads.add(identifier)) {
             return;
         }
 
@@ -164,6 +186,7 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
                         GameDetails loadedDetails = gameDetailsProvider.loadDetails(identifier);
                         if (generation == cacheGeneration.get()) {
                             cacheDetails(loadedDetails);
+                            scheduleLowPriorityImagePreload(loadedDetails);
                         }
                     }
                 } catch (Exception ignored) {
@@ -185,7 +208,7 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
     }
 
     private void scheduleLowPriorityImagePreload(final GameDetails details) {
-        if (!mayLoadLowPriorityImages()) {
+        if (imageExecutor == null || !mayLoadLowPriorityImages()) {
             return;
         }
 
@@ -209,6 +232,7 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
         return !Thread.currentThread().isInterrupted()
                 && activeUserLoads.get() == 0
                 && activeDetailLoads.get() == 0
+                && detailExecutor != null
                 && detailExecutor.getQueue().isEmpty();
     }
 }
