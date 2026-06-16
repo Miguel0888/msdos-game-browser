@@ -14,7 +14,7 @@
             <option value="$PROJECT_DIR$/msdos-game-browser-frontend-swing" />
             <option value="$PROJECT_DIR$/msdos-game-browser-infrastructure-archive" />
             <option value="$PROJECT_DIR$/msdos-game-browser-infrastructure-local" />
-            <option value="$PROJECT_DIR$/msdos-game-browser-launcher" />
+            <option value="$PROJECT_DIR$/msdos-game-browser-ui" />
           </set>
         </option>
       </GradleProjectSettings>

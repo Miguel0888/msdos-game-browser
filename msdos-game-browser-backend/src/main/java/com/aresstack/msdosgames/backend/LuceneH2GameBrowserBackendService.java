@@ -1,0 +1,238 @@
+package com.aresstack.msdosgames.backend;
+
+import com.aresstack.msdosgames.application.port.GameBrowserBackendService;
+import com.aresstack.msdosgames.application.port.GameCatalog;
+import com.aresstack.msdosgames.application.port.GameDetailsProvider;
+import com.aresstack.msdosgames.domain.GameDetails;
+import com.aresstack.msdosgames.domain.GameIdentifier;
+import com.aresstack.msdosgames.domain.GameImage;
+import com.aresstack.msdosgames.domain.GamePage;
+import com.aresstack.msdosgames.domain.GameSearchCriteria;
+import com.aresstack.msdosgames.domain.GameSummary;
+
+import java.io.File;
+import java.io.IOException;
+import java.sql.SQLException;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public final class LuceneH2GameBrowserBackendService implements GameBrowserBackendService {
+
+    private final PreloadConfiguration preloadConfiguration;
+    private final GameCatalog gameCatalog;
+    private final GameDetailsProvider gameDetailsProvider;
+    private final H2GameDetailsStore store;
+    private final LuceneGameDetailsIndex index;
+    private final ExecutorService userExecutor;
+    private final ThreadPoolExecutor detailExecutor;
+    private final ExecutorService imageExecutor;
+    private final Set<GameIdentifier> queuedDetailLoads = Collections.synchronizedSet(new HashSet<GameIdentifier>());
+    private final AtomicInteger activeUserLoads = new AtomicInteger();
+    private final AtomicInteger activeDetailLoads = new AtomicInteger();
+    private final AtomicInteger cacheGeneration = new AtomicInteger();
+
+    private volatile Future<?> lowPriorityImageFuture;
+
+    public LuceneH2GameBrowserBackendService(GameCatalog gameCatalog, GameDetailsProvider gameDetailsProvider, File databaseDirectory) {
+        this(gameCatalog, gameDetailsProvider, databaseDirectory, PreloadConfiguration.disabled());
+    }
+
+    public LuceneH2GameBrowserBackendService(
+            GameCatalog gameCatalog,
+            GameDetailsProvider gameDetailsProvider,
+            File databaseDirectory,
+            PreloadConfiguration preloadConfiguration) {
+        if (gameCatalog == null) {
+            throw new IllegalArgumentException("gameCatalog must not be null");
+        }
+        if (gameDetailsProvider == null) {
+            throw new IllegalArgumentException("gameDetailsProvider must not be null");
+        }
+        this.preloadConfiguration = preloadConfiguration == null ? PreloadConfiguration.disabled() : preloadConfiguration;
+        this.gameCatalog = gameCatalog;
+        this.gameDetailsProvider = gameDetailsProvider;
+        this.store = new H2GameDetailsStore(databaseDirectory);
+        this.index = new LuceneGameDetailsIndex();
+        this.userExecutor = Executors.newSingleThreadExecutor(new NamedThreadFactory("msdos-user-load"));
+        if (this.preloadConfiguration.isEnabled()) {
+            this.detailExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(this.preloadConfiguration.getDetailThreads(), new NamedThreadFactory("msdos-preload-details"));
+            this.imageExecutor = this.preloadConfiguration.isPreloadImagesWhenIdle()
+                    ? Executors.newSingleThreadExecutor(new NamedThreadFactory("msdos-preload-images"))
+                    : null;
+        } else {
+            this.detailExecutor = null;
+            this.imageExecutor = null;
+        }
+    }
+
+    @Override
+    public GamePage browse(GameSearchCriteria criteria) throws IOException {
+        return gameCatalog.browse(criteria);
+    }
+
+    @Override
+    public GamePage search(GameSearchCriteria criteria) throws IOException {
+        return gameCatalog.search(criteria);
+    }
+
+    @Override
+    public GameDetails loadDetailsNow(final GameIdentifier identifier) throws Exception {
+        cancelLowPriorityImagePreloading();
+        Future<GameDetails> future = userExecutor.submit(new Callable<GameDetails>() {
+            @Override
+            public GameDetails call() throws Exception {
+                activeUserLoads.incrementAndGet();
+                try {
+                    GameDetails details = findCachedDetails(identifier);
+                    if (details == null) {
+                        details = gameDetailsProvider.loadDetails(identifier);
+                        cacheDetails(details);
+                    }
+                    return details;
+                } finally {
+                    activeUserLoads.decrementAndGet();
+                }
+            }
+        });
+        return future.get();
+    }
+
+    @Override
+    public void preloadDetails(List<GameSummary> games, int firstIndex, int lastIndex) {
+        if (!preloadConfiguration.isEnabled()) {
+            return;
+        }
+        cancelLowPriorityImagePreloading();
+        if (games == null || games.isEmpty()) {
+            return;
+        }
+
+        int safeFirstIndex = Math.max(0, firstIndex - preloadConfiguration.getLookBehind());
+        int safeLastIndex = Math.min(games.size() - 1, lastIndex + preloadConfiguration.getLookAhead());
+        for (int index = safeFirstIndex; index <= safeLastIndex; index++) {
+            queueBackgroundDetailsLoad(games.get(index).getIdentifier());
+        }
+    }
+
+    @Override
+    public byte[] loadPreviewImageNow(final GameImage image) throws Exception {
+        cancelLowPriorityImagePreloading();
+        Future<byte[]> future = userExecutor.submit(new Callable<byte[]>() {
+            @Override
+            public byte[] call() throws Exception {
+                activeUserLoads.incrementAndGet();
+                try {
+                    return store.loadImage(image.getUrl());
+                } finally {
+                    activeUserLoads.decrementAndGet();
+                }
+            }
+        });
+        return future.get();
+    }
+
+    @Override
+    public void cancelLowPriorityImagePreloading() {
+        Future<?> future = lowPriorityImageFuture;
+        if (future != null && !future.isDone()) {
+            future.cancel(true);
+        }
+    }
+
+    @Override
+    public void clearDatabaseCache() throws Exception {
+        cancelLowPriorityImagePreloading();
+        cacheGeneration.incrementAndGet();
+        queuedDetailLoads.clear();
+        store.clearAll();
+        index.clear();
+    }
+
+    @Override
+    public void shutdown() {
+        cancelLowPriorityImagePreloading();
+        userExecutor.shutdownNow();
+        if (detailExecutor != null) {
+            detailExecutor.shutdownNow();
+        }
+        if (imageExecutor != null) {
+            imageExecutor.shutdownNow();
+        }
+        store.close();
+        index.close();
+    }
+
+    private void queueBackgroundDetailsLoad(final GameIdentifier identifier) {
+        if (detailExecutor == null || !queuedDetailLoads.add(identifier)) {
+            return;
+        }
+
+        final int generation = cacheGeneration.get();
+        detailExecutor.submit(new Runnable() {
+            @Override
+            public void run() {
+                activeDetailLoads.incrementAndGet();
+                try {
+                    GameDetails cachedDetails = findCachedDetails(identifier);
+                    if (cachedDetails == null) {
+                        GameDetails loadedDetails = gameDetailsProvider.loadDetails(identifier);
+                        if (generation == cacheGeneration.get()) {
+                            cacheDetails(loadedDetails);
+                            scheduleLowPriorityImagePreload(loadedDetails);
+                        }
+                    }
+                } catch (Exception ignored) {
+                    queuedDetailLoads.remove(identifier);
+                } finally {
+                    activeDetailLoads.decrementAndGet();
+                }
+            }
+        });
+    }
+
+    private GameDetails findCachedDetails(GameIdentifier identifier) throws SQLException {
+        return store.findDetails(identifier);
+    }
+
+    private void cacheDetails(GameDetails details) throws SQLException, IOException {
+        store.saveDetails(details);
+        index.index(details);
+    }
+
+    private void scheduleLowPriorityImagePreload(final GameDetails details) {
+        if (imageExecutor == null || !mayLoadLowPriorityImages()) {
+            return;
+        }
+
+        lowPriorityImageFuture = imageExecutor.submit(new Runnable() {
+            @Override
+            public void run() {
+                for (GameImage image : details.getPreviewImages()) {
+                    if (!mayLoadLowPriorityImages()) {
+                        return;
+                    }
+                    try {
+                        store.loadImage(image.getUrl());
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+        });
+    }
+
+    private boolean mayLoadLowPriorityImages() {
+        return !Thread.currentThread().isInterrupted()
+                && activeUserLoads.get() == 0
+                && activeDetailLoads.get() == 0
+                && detailExecutor != null
+                && detailExecutor.getQueue().isEmpty();
+    }
+}

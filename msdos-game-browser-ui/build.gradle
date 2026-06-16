@@ -9,7 +9,7 @@ dependencies {
 }
 
 application {
-    mainClass = 'de.bund.zrb.msdosgames.ui.MsdosGameBrowserApplication'
+    mainClass = 'com.aresstack.msdosgames.ui.MsdosGameBrowserApplication'
 }
 
 publishing {

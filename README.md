@@ -36,18 +36,18 @@ Swing-Anwendung, die das Backend-Artefakt verwendet.
 Startklasse:
 
 ```text
-de.bund.zrb.msdosgames.ui.MsdosGameBrowserApplication
+ui.msdosgames.com.aresstack.MsdosGameBrowserApplication
 ```
 
 ## Backend Quickstart
 
 ```java
-import de.bund.zrb.msdosgames.application.port.GameBrowserBackendService;
-import de.bund.zrb.msdosgames.backend.MsdosGameBrowserBackend;
-import de.bund.zrb.msdosgames.domain.GameDetails;
-import de.bund.zrb.msdosgames.domain.GamePage;
-import de.bund.zrb.msdosgames.domain.GameSearchCriteria;
-import de.bund.zrb.msdosgames.domain.GameSummary;
+import port.application.msdosgames.com.aresstack.GameBrowserBackendService;
+import backend.msdosgames.com.aresstack.MsdosGameBrowserBackend;
+import domain.msdosgames.com.aresstack.GameDetails;
+import domain.msdosgames.com.aresstack.GamePage;
+import domain.msdosgames.com.aresstack.GameSearchCriteria;
+import domain.msdosgames.com.aresstack.GameSummary;
 
 public final class Example {
     public static void main(String[] args) throws Exception {
@@ -199,7 +199,7 @@ Image-Preload-Thread: aus
 Preloading kann explizit aktiviert werden:
 
 ```java
-import de.bund.zrb.msdosgames.backend.PreloadConfiguration;
+import backend.msdosgames.com.aresstack.PreloadConfiguration;
 
 MsdosGameBrowserBackend backend = MsdosGameBrowserBackend.create(
     PreloadConfiguration.enabled(
