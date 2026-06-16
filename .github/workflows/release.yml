@@ -39,4 +39,4 @@ jobs:
             -Pversion=${{ steps.ver.outputs.version }} \
             --no-daemon \
             -x test \
-            publishAllPublicationsToCentralPortal
+            publishAggregationToCentralPortal

@@ -18,7 +18,12 @@ if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_17)) {
     apply plugin: 'com.gradleup.nmcp.aggregation'
 
     nmcpAggregation {
-        publishAllProjectsProbablyBreakingProjectIsolation { }
+        centralPortal {
+            username = findProperty('centralUsername')
+            password = findProperty('centralPassword')
+            publishingType = 'USER_MANAGED'
+        }
+        publishAllProjectsProbablyBreakingProjectIsolation()
     }
 } else {
     tasks.register('publishAllPublicationsToCentralPortal') {
