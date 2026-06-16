@@ -20,6 +20,7 @@ import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.SwingUtilities;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.SwingWorker;
@@ -28,6 +29,9 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.awt.Rectangle;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.util.List;
 
@@ -38,6 +42,7 @@ public final class GameBrowserFrame extends JFrame {
     private final BrowseGamesUseCase browseGamesUseCase;
     private final SearchGamesUseCase searchGamesUseCase;
     private final LoadGameDetailsUseCase loadGameDetailsUseCase;
+    private final GameDetailsPreloader gameDetailsPreloader;
     private final AcceptLicenseUseCase acceptLicenseUseCase;
     private final DownloadGameUseCase downloadGameUseCase;
     private final File downloadDirectory;
@@ -69,6 +74,7 @@ public final class GameBrowserFrame extends JFrame {
         this.browseGamesUseCase = browseGamesUseCase;
         this.searchGamesUseCase = searchGamesUseCase;
         this.loadGameDetailsUseCase = loadGameDetailsUseCase;
+        this.gameDetailsPreloader = new GameDetailsPreloader(loadGameDetailsUseCase);
         this.acceptLicenseUseCase = acceptLicenseUseCase;
         this.downloadGameUseCase = downloadGameUseCase;
         this.downloadDirectory = downloadDirectory;
@@ -88,6 +94,12 @@ public final class GameBrowserFrame extends JFrame {
         add(createContentPane(), BorderLayout.CENTER);
         add(createStatusPanel(), BorderLayout.SOUTH);
         gameDetailsView.clear(downloadDirectory);
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosed(WindowEvent event) {
+                gameDetailsPreloader.shutdown();
+            }
+        });
         setSize(1250, 800);
         setLocationRelativeTo(null);
     }
@@ -106,6 +118,7 @@ public final class GameBrowserFrame extends JFrame {
 
     private JSplitPane createContentPane() {
         JScrollPane tableScrollPane = new JScrollPane(gameTable);
+        tableScrollPane.getViewport().addChangeListener(event -> preloadVisibleGames());
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, tableScrollPane, gameDetailsView);
         splitPane.setResizeWeight(0.40d);
         return splitPane;
@@ -219,6 +232,30 @@ public final class GameBrowserFrame extends JFrame {
         nextCursor = page.getNextCursor();
         nextPageButton.setEnabled(page.hasNextPage());
         statusLabel.setText(games.size() + " Spiele geladen" + (page.hasNextPage() ? " · weitere verfügbar" : ""));
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                preloadVisibleGames();
+            }
+        });
+    }
+
+    private void preloadVisibleGames() {
+        if (gameTableModel.getRowCount() == 0) {
+            return;
+        }
+
+        Rectangle visibleRect = gameTable.getVisibleRect();
+        int firstViewRow = gameTable.rowAtPoint(visibleRect.getLocation());
+        if (firstViewRow < 0) {
+            firstViewRow = 0;
+        }
+
+        int visibleRows = Math.max(1, visibleRect.height / Math.max(1, gameTable.getRowHeight())) + 12;
+        int lastViewRow = Math.min(gameTable.getRowCount() - 1, firstViewRow + visibleRows);
+        int firstModelRow = gameTable.convertRowIndexToModel(firstViewRow);
+        int lastModelRow = gameTable.convertRowIndexToModel(lastViewRow);
+        gameDetailsPreloader.preload(gameTableModel.getGames(), Math.min(firstModelRow, lastModelRow), Math.max(firstModelRow, lastModelRow));
     }
 
     private void loadSelectedGameDetails() {
@@ -233,7 +270,7 @@ public final class GameBrowserFrame extends JFrame {
         new SwingWorker<GameDetails, Void>() {
             @Override
             protected GameDetails doInBackground() throws Exception {
-                return loadGameDetailsUseCase.loadDetails(summary.getIdentifier());
+                return gameDetailsPreloader.load(summary.getIdentifier());
             }
 
             @Override

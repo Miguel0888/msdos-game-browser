@@ -28,6 +28,10 @@ final class GameTableModel extends AbstractTableModel {
         return games.get(rowIndex);
     }
 
+    public List<GameSummary> getGames() {
+        return new ArrayList<GameSummary>(games);
+    }
+
     @Override
     public int getRowCount() {
         return games.size();
