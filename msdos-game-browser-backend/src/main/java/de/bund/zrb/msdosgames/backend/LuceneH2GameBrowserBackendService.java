@@ -21,7 +21,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class LuceneH2GameBrowserBackendService implements GameBrowserBackendService {
@@ -36,6 +35,7 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
     private final ThreadPoolExecutor detailExecutor;
     private final ExecutorService imageExecutor;
     private final Set<GameIdentifier> queuedDetailLoads = Collections.synchronizedSet(new HashSet<GameIdentifier>());
+    private final AtomicInteger activeUserLoads = new AtomicInteger();
     private final AtomicInteger activeDetailLoads = new AtomicInteger();
 
     private volatile Future<?> lowPriorityImageFuture;
@@ -68,16 +68,21 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
 
     @Override
     public GameDetails loadDetailsNow(final GameIdentifier identifier) throws Exception {
+        cancelLowPriorityImagePreloading();
         Future<GameDetails> future = userExecutor.submit(new Callable<GameDetails>() {
             @Override
             public GameDetails call() throws Exception {
-                GameDetails details = findCachedDetails(identifier);
-                if (details == null) {
-                    details = gameDetailsProvider.loadDetails(identifier);
-                    cacheDetails(details);
+                activeUserLoads.incrementAndGet();
+                try {
+                    GameDetails details = findCachedDetails(identifier);
+                    if (details == null) {
+                        details = gameDetailsProvider.loadDetails(identifier);
+                        cacheDetails(details);
+                    }
+                    return details;
+                } finally {
+                    activeUserLoads.decrementAndGet();
                 }
-                loadImagesNow(details);
-                return details;
             }
         });
         return future.get();
@@ -99,10 +104,16 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
 
     @Override
     public byte[] loadPreviewImageNow(final GameImage image) throws Exception {
+        cancelLowPriorityImagePreloading();
         Future<byte[]> future = userExecutor.submit(new Callable<byte[]>() {
             @Override
             public byte[] call() throws Exception {
-                return store.loadImage(image.getUrl());
+                activeUserLoads.incrementAndGet();
+                try {
+                    return store.loadImage(image.getUrl());
+                } finally {
+                    activeUserLoads.decrementAndGet();
+                }
             }
         });
         return future.get();
@@ -140,11 +151,9 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
                     if (cachedDetails == null) {
                         GameDetails loadedDetails = gameDetailsProvider.loadDetails(identifier);
                         cacheDetails(loadedDetails);
-                        scheduleLowPriorityImagePreload(loadedDetails);
-                    } else {
-                        scheduleLowPriorityImagePreload(cachedDetails);
                     }
                 } catch (Exception ignored) {
+                    queuedDetailLoads.remove(identifier);
                 } finally {
                     activeDetailLoads.decrementAndGet();
                 }
@@ -161,14 +170,8 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
         index.index(details);
     }
 
-    private void loadImagesNow(GameDetails details) throws Exception {
-        for (GameImage image : details.getPreviewImages()) {
-            store.loadImage(image.getUrl());
-        }
-    }
-
     private void scheduleLowPriorityImagePreload(final GameDetails details) {
-        if (activeDetailLoads.get() > 0 || detailExecutor.getQueue().size() > 0) {
+        if (!mayLoadLowPriorityImages()) {
             return;
         }
 
@@ -176,7 +179,7 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
             @Override
             public void run() {
                 for (GameImage image : details.getPreviewImages()) {
-                    if (Thread.currentThread().isInterrupted()) {
+                    if (!mayLoadLowPriorityImages()) {
                         return;
                     }
                     try {
@@ -186,5 +189,12 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
                 }
             }
         });
+    }
+
+    private boolean mayLoadLowPriorityImages() {
+        return !Thread.currentThread().isInterrupted()
+                && activeUserLoads.get() == 0
+                && activeDetailLoads.get() == 0
+                && detailExecutor.getQueue().isEmpty();
     }
 }

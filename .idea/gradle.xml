@@ -9,6 +9,7 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/msdos-game-browser-application" />
+            <option value="$PROJECT_DIR$/msdos-game-browser-backend" />
             <option value="$PROJECT_DIR$/msdos-game-browser-domain" />
             <option value="$PROJECT_DIR$/msdos-game-browser-frontend-swing" />
             <option value="$PROJECT_DIR$/msdos-game-browser-infrastructure-archive" />
