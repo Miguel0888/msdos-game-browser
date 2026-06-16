@@ -15,6 +15,9 @@ import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
@@ -42,6 +45,7 @@ public final class GameBrowserFrame extends JFrame {
     private final GameBrowserBackendService backendService;
     private final AcceptLicenseUseCase acceptLicenseUseCase;
     private final DownloadGameUseCase downloadGameUseCase;
+    private final File applicationDirectory;
     private final File downloadDirectory;
     private final DownloadDirectoryOpener downloadDirectoryOpener = new DownloadDirectoryOpener();
 
@@ -64,6 +68,7 @@ public final class GameBrowserFrame extends JFrame {
             GameBrowserBackendService backendService,
             AcceptLicenseUseCase acceptLicenseUseCase,
             DownloadGameUseCase downloadGameUseCase,
+            File applicationDirectory,
             File downloadDirectory) {
         super("MS-DOS Game Browser");
         this.backendService = backendService;
@@ -75,6 +80,7 @@ public final class GameBrowserFrame extends JFrame {
             }
         });
         this.downloadGameUseCase = downloadGameUseCase;
+        this.applicationDirectory = applicationDirectory;
         this.downloadDirectory = downloadDirectory;
         configureFrame();
         bindActions();
@@ -87,6 +93,7 @@ public final class GameBrowserFrame extends JFrame {
 
     private void configureFrame() {
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        setJMenuBar(createMenuBar());
         setLayout(new BorderLayout(8, 8));
         add(createSearchPanel(), BorderLayout.NORTH);
         add(createContentPane(), BorderLayout.CENTER);
@@ -100,6 +107,27 @@ public final class GameBrowserFrame extends JFrame {
         });
         setSize(1250, 800);
         setLocationRelativeTo(null);
+    }
+
+    private JMenuBar createMenuBar() {
+        JMenuBar menuBar = new JMenuBar();
+        JMenu fileMenu = new JMenu("Datei");
+
+        JMenuItem openSettingsFolderItem = new JMenuItem("Einstellungsordner öffnen");
+        openSettingsFolderItem.addActionListener(event -> openSettingsFolder());
+
+        JMenuItem clearDatabaseItem = new JMenuItem("Datenbank-Cache löschen");
+        clearDatabaseItem.addActionListener(event -> clearDatabaseCache());
+
+        JMenuItem exitItem = new JMenuItem("Beenden");
+        exitItem.addActionListener(event -> dispose());
+
+        fileMenu.add(openSettingsFolderItem);
+        fileMenu.add(clearDatabaseItem);
+        fileMenu.addSeparator();
+        fileMenu.add(exitItem);
+        menuBar.add(fileMenu);
+        return menuBar;
     }
 
     private JPanel createSearchPanel() {
@@ -348,6 +376,48 @@ public final class GameBrowserFrame extends JFrame {
                     statusLabel.setText("Download abgeschlossen: " + targetFile.getAbsolutePath());
                 } catch (Exception exception) {
                     showError("Download fehlgeschlagen.", exception);
+                } finally {
+                    setReady();
+                }
+            }
+        }.execute();
+    }
+
+    private void openSettingsFolder() {
+        try {
+            downloadDirectoryOpener.openDirectory(applicationDirectory);
+            statusLabel.setText("Einstellungsordner geöffnet: " + applicationDirectory.getAbsolutePath());
+        } catch (Exception exception) {
+            showError("Einstellungsordner konnte nicht geöffnet werden: " + applicationDirectory.getAbsolutePath(), exception);
+        }
+    }
+
+    private void clearDatabaseCache() {
+        int result = JOptionPane.showConfirmDialog(
+                this,
+                "Soll der Datenbank-Cache wirklich gelöscht werden?\nGeladene Details und Bildvorschauen werden danach neu geladen.",
+                "Datenbank-Cache löschen",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+        if (result != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        setBusy("Lösche Datenbank-Cache ...");
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                backendService.clearDatabaseCache();
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                    statusLabel.setText("Datenbank-Cache gelöscht");
+                } catch (Exception exception) {
+                    showError("Datenbank-Cache konnte nicht gelöscht werden.", exception);
                 } finally {
                     setReady();
                 }

@@ -43,6 +43,7 @@ public final class MsdosGameBrowserApplication {
                 backendService,
                 new AcceptLicenseUseCase(licenseAcceptanceStore),
                 new DownloadGameUseCase(licenseAcceptanceStore, downloadClient),
+                ApplicationDirectories.defaultApplicationDirectory(),
                 ApplicationDirectories.defaultDownloadDirectory());
     }
 }

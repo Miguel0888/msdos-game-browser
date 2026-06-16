@@ -24,5 +24,7 @@ public interface GameBrowserBackendService {
 
     void cancelLowPriorityImagePreloading();
 
+    void clearDatabaseCache() throws Exception;
+
     void shutdown();
 }

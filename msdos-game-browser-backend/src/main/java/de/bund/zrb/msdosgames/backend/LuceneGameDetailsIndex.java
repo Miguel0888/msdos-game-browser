@@ -77,6 +77,11 @@ final class LuceneGameDetailsIndex {
         }
     }
 
+    synchronized void clear() throws IOException {
+        writer.deleteAll();
+        writer.commit();
+    }
+
     synchronized void close() {
         try {
             writer.close();

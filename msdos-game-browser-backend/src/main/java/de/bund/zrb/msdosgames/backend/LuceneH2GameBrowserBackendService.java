@@ -38,6 +38,7 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
     private final Set<GameIdentifier> queuedDetailLoads = Collections.synchronizedSet(new HashSet<GameIdentifier>());
     private final AtomicInteger activeUserLoads = new AtomicInteger();
     private final AtomicInteger activeDetailLoads = new AtomicInteger();
+    private final AtomicInteger cacheGeneration = new AtomicInteger();
 
     private volatile Future<?> lowPriorityImageFuture;
 
@@ -129,6 +130,15 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
     }
 
     @Override
+    public void clearDatabaseCache() throws Exception {
+        cancelLowPriorityImagePreloading();
+        cacheGeneration.incrementAndGet();
+        queuedDetailLoads.clear();
+        store.clearAll();
+        index.clear();
+    }
+
+    @Override
     public void shutdown() {
         cancelLowPriorityImagePreloading();
         userExecutor.shutdownNow();
@@ -143,6 +153,7 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
             return;
         }
 
+        final int generation = cacheGeneration.get();
         detailExecutor.submit(new Runnable() {
             @Override
             public void run() {
@@ -151,7 +162,9 @@ public final class LuceneH2GameBrowserBackendService implements GameBrowserBacke
                     GameDetails cachedDetails = findCachedDetails(identifier);
                     if (cachedDetails == null) {
                         GameDetails loadedDetails = gameDetailsProvider.loadDetails(identifier);
-                        cacheDetails(loadedDetails);
+                        if (generation == cacheGeneration.get()) {
+                            cacheDetails(loadedDetails);
+                        }
                     }
                 } catch (Exception ignored) {
                     queuedDetailLoads.remove(identifier);

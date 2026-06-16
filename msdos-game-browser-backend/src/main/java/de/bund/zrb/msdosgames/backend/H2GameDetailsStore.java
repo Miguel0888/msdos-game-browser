@@ -103,6 +103,16 @@ final class H2GameDetailsStore {
         return loadedImage;
     }
 
+    synchronized void clearAll() throws SQLException {
+        Statement statement = connection.createStatement();
+        try {
+            statement.executeUpdate("delete from image_cache");
+            statement.executeUpdate("delete from game_details");
+        } finally {
+            statement.close();
+        }
+    }
+
     synchronized void close() {
         try {
             connection.close();
